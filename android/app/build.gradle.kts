@@ -1,14 +1,10 @@
 plugins {
+    // Every plugin here is self-versioned — deliberately not sharing a
+    // classpath entry with :core's `kotlin("jvm")` (see the comment in
+    // ../build.gradle.kts for why that caused a KotlinAndroidTarget/
+    // BaseVariant class-generation failure).
     id("com.android.application") version "8.5.2"
-    // No explicit version here: root build.gradle.kts's `kotlin("jvm")
-    // ... apply false` already resolves the Kotlin Gradle Plugin jar
-    // (which also bundles the .android plugin ID) onto the shared
-    // classpath at 2.0.21 — redeclaring a version here conflicts with
-    // that ("already on the classpath with an unknown version, so
-    // compatibility cannot be checked").
-    id("org.jetbrains.kotlin.android")
-    // Unlike .android, the Compose compiler plugin is NOT bundled into
-    // that same jar/classpath entry, so it does need its own version.
+    id("org.jetbrains.kotlin.android") version "2.0.21"
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
 }
 

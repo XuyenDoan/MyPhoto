@@ -74,3 +74,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   dropdowns populate, drop-to-preview, control changes reschedule
   preview, Export button drives a real batch export); ruff and strict
   mypy clean.
+- `myphoto.spec`: PyInstaller build spec bundling `presets/`. Verified
+  end to end on Linux with an offscreen Qt platform (builds, launches,
+  resolves the bundled presets directory via `sys._MEIPASS`, runs the
+  Qt event loop without crashing) — a Windows build should still be
+  smoke-tested before shipping, since PyInstaller's Windows path has
+  its own quirks not exercised on Linux.

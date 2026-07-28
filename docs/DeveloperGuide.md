@@ -69,11 +69,23 @@ ships; until then, treat any preset format changes as part of that PR.
 [Conventional Commits](https://www.conventionalcommits.org/) — see
 [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-## Building a Windows executable
+## Running the app
 
-Packaging uses PyInstaller. A `myphoto.spec` will be added when the GUI
-entry point (`myphoto.app:main`) is implemented:
+```bash
+python -m myphoto.app
+# or, after `pip install -e .`:
+myphoto
+```
+
+## Building a Windows executable
 
 ```bash
 pyinstaller myphoto.spec
 ```
+
+Produces a `dist/MyPhoto/` folder (`MyPhoto.exe` on Windows) with
+`presets/` bundled alongside it under `_internal/` — `myphoto.resources.
+presets_dir()` finds it there via `sys._MEIPASS` at runtime. Verified end
+to end on Linux (offscreen Qt platform); cross-check on Windows before
+shipping, since PyInstaller's Windows build has its own quirks (codesigning,
+antivirus false positives, etc.) not exercised here.

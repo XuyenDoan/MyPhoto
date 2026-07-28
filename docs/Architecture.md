@@ -160,6 +160,28 @@ runnable (and the Qt signal object it owns) mid-emit and crash.
 4. Linear-light operations where color-correct, gamma-correct handling at
    display/encode boundaries
 
+## GUI
+
+`myphoto.gui` implements the four-region layout from the spec on top of
+`EditSession`:
+
+- `ImageListPanel` (left) — a `QListWidget` accepting drag & drop of
+  supported files, emitting `images_dropped`/`selection_changed`.
+- `PreviewPanel` (center) — shows either the rendered or (via a "Show
+  Original" checkbox) the original image, Ctrl+wheel to zoom.
+- `ControlsPanel` (right) — Base Profile / Film Simulation dropdowns
+  (populated from `PresetLoader`), Strength and Film Grain sliders, and
+  the export destination fields (format, quality, output folder, rename
+  pattern).
+- A bottom bar — progress bar, Cancel, and Export buttons.
+
+`MainWindow` wires these to `EditSession` and debounces preview
+re-renders (150ms `QTimer`) so dragging a slider doesn't trigger a render
+per pixel of mouse movement. `myphoto.app.main()` is the process entry
+point (`myphoto` console script); it resolves the bundled `presets/`
+directory via `myphoto.resources.presets_dir()`, which works both from a
+source checkout and from a PyInstaller-frozen build.
+
 ## Non-goals
 
 Crop, layers, brush tools, healing, object removal, AI portrait editing —

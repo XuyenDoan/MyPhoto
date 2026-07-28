@@ -61,4 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   list management, current preset/strength/grain state,
   `render_preview()` (downsampled for interactive speed) and
   `export_all()` (delegates to `BatchProcessor` at full resolution).
-- 98 unit tests total; ruff and strict mypy clean.
+- `myphoto.gui`: `ImageListPanel` (drag & drop import), `PreviewPanel`
+  (Before/After toggle, Ctrl+wheel zoom), `ControlsPanel` (Base Profile /
+  Film Simulation dropdowns, Strength and Film Grain sliders, export
+  format/quality/folder/rename-pattern), and `MainWindow`, which wires
+  them all to `EditSession` with a debounced preview re-render.
+- `myphoto.app.main()`: the process entry point (`myphoto` console
+  script), plus `myphoto.resources.presets_dir()` to locate the bundled
+  `presets/` directory from both a source checkout and a PyInstaller
+  build.
+- 102 unit tests total (including full-window smoke tests: preset
+  dropdowns populate, drop-to-preview, control changes reschedule
+  preview, Export button drives a real batch export); ruff and strict
+  mypy clean.

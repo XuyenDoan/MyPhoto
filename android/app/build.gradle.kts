@@ -14,12 +14,18 @@ plugins {
 
 android {
     namespace = "com.myphoto.android"
-    compileSdk = 35
+    // 34 (Android 14), not 35: AGP 8.5.2 + Kotlin 2.0.21 hit a plugin-apply
+    // failure against compileSdk 35 in CI ("Could not generate a decorated
+    // class for type KotlinAndroidTarget > com/android/build/gradle/api/
+    // BaseVariant") — a known rough edge in early AGP 8.5.x support for
+    // API 35. 34 is unambiguously supported by this AGP/Kotlin pairing.
+    // Bump back to 35 once on a newer AGP (8.6+) in Android Studio.
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.myphoto.android"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
     }

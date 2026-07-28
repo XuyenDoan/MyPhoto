@@ -39,7 +39,13 @@ itself. See [`docs/Architecture.md`](docs/Architecture.md).
 
 ## Project status
 
-Early scaffolding stage — see [`CHANGELOG.md`](CHANGELOG.md).
+First functional end-to-end version: Image Loader, Color Engine, Preset
+Engine (8 Base Profiles, 9 Film Simulations), Export Engine, Batch
+Processor, Settings, and the PySide6 GUI are all implemented and tested
+(100+ unit tests, ruff- and strict-mypy-clean), and `pyinstaller
+myphoto.spec` produces a working build. See [`CHANGELOG.md`](CHANGELOG.md)
+for details and known limitations (e.g. ICC/EXIF embedding on 16-bit
+PNG/TIFF export).
 
 ## Getting started (development)
 
@@ -48,6 +54,7 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -e ".[dev]"
 pytest
+python -m myphoto.app          # run the app
 ```
 
 See [`docs/DeveloperGuide.md`](docs/DeveloperGuide.md) for details.

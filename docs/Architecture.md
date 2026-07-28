@@ -218,14 +218,17 @@ batch export), and `MediaStoreExporter`, which writes exports into a
 `Pictures/MyPhoto` gallery album — every export is a new MediaStore item,
 so (like the desktop Export Engine) the original is never overwritten.
 
-See [`android/README.md`](../android/README.md) for build instructions,
-the full scope-difference list, and a build-verification note: `:core`
-was built and unit-tested in this project's development environment (44
-JUnit tests), but `:app` requires the Android Gradle Plugin and Android
-SDK (served from `dl.google.com`/`maven.google.com`), which that
-environment's network policy blocked — `:app` should be treated as
-written-but-unverified until it's opened in Android Studio and smoke
-tested on a device or emulator.
+See [`android/README.md`](../android/README.md) for build instructions
+and the full scope-difference list. `:core` was built and unit-tested in
+this project's development environment (44 JUnit tests); `:app` needed
+the Android Gradle Plugin and Android SDK (served from
+`dl.google.com`/`maven.google.com`), which that environment's network
+policy blocked, so it's built by
+[`.github/workflows/android-build.yml`](../.github/workflows/android-build.yml)
+on GitHub Actions instead — `:app:assembleDebug` succeeds there and
+produces an installable debug APK on every push to `main` touching
+`android/**`. That confirms the module compiles and packages correctly;
+it has not yet been smoke-tested on a real device or emulator.
 
 ## Non-goals
 

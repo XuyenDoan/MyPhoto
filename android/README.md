@@ -73,19 +73,24 @@ emulator. From the command line, once you have the Android SDK set up
 
 ### A note on how this was developed
 
-This module was written and, for `:core`, built and unit-tested (44
-JUnit tests, all passing) in a sandboxed environment whose outbound proxy
+This module was written in a sandboxed environment whose outbound proxy
 blocks `dl.google.com` / `maven.google.com` (verified: the CONNECT tunnel
-returns 403). Those hosts serve the Android Gradle Plugin and Android SDK
-components, so **`:app` was written but could not be compiled or run
-here** — no emulator, no real device, no AGP resolution. `root
-build.gradle.kts` and `gradle.properties`
-(`org.gradle.configureondemand=true`) are deliberately structured so that
-`:core` still builds and tests cleanly despite `:app` declaring
-Android-only plugins. Treat `:app` as reviewed-but-unverified: open it in
-Android Studio and do a real device/emulator smoke test (import photos,
-switch presets, check Strength/Grain, export, confirm the files land in
-the gallery) before relying on it.
+returns 403) — the hosts that serve the Android Gradle Plugin and Android
+SDK, so `:app` could not be compiled there. `:core` was built and
+unit-tested locally (44 JUnit tests, all passing); `root build.gradle.kts`
+and `gradle.properties` (`org.gradle.configureondemand=true`) are
+deliberately structured so `:core` builds cleanly on its own despite
+`:app` declaring Android-only plugins.
+
+`:app` itself is built and verified by
+[`.github/workflows/android-build.yml`](../.github/workflows/android-build.yml)
+on GitHub Actions (which has normal internet access) — `./gradlew
+:app:assembleDebug` succeeds there and produces an installable debug APK
+on every push to `main` that touches `android/**`. That confirms the
+module *compiles and packages* correctly; it has **not** been smoke-tested
+on a real device or emulator (import photos, switch presets, check
+Strength/Grain, export, confirm files land in the gallery) — do that
+before relying on it for real use.
 
 ## Known follow-ups
 

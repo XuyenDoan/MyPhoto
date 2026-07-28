@@ -25,18 +25,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     desktop's `EditSession`: image list, current preset/strength/grain,
     debounced preview, batch export), `MediaStoreExporter` (exports to a
     `Pictures/MyPhoto` gallery album, never touching the original),
-    DataStore-backed settings for last-used presets. **Written but not
-    build-verified** — the development environment's network policy
-    blocks `dl.google.com`/`maven.google.com` (Android Gradle
-    Plugin/SDK); needs an Android Studio build + device/emulator smoke
-    test before shipping. See `android/README.md`.
+    DataStore-backed settings for last-used presets. Builds and packages
+    successfully (verified via CI, see below); not yet smoke-tested on a
+    real device/emulator. See `android/README.md`.
 
 - `.github/workflows/android-build.yml`: builds `android/app`'s debug APK
   on GitHub Actions (runs `:core:test` first, then
   `:app:assembleDebug`) and uploads it as a downloadable artifact —
   works around this project's sandbox not having access to
   `dl.google.com`/`maven.google.com`, and lets anyone get an installable
-  APK without setting up Android Studio locally.
+  APK without setting up Android Studio locally. First green run produced
+  a working `myphoto-debug-apk` artifact after fixing three Gradle/AGP
+  configuration issues (Kotlin plugin classpath sharing between `:core`
+  and `:app`, a missing Compose compiler plugin version, an
+  unclosed-block-comment/API-name compile error) — see commit history in
+  `android/` for details.
 
 ### Fixed
 

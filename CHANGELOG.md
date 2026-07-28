@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Android `MyPhotoScreen`: the main content `Column` had no
+  `verticalScroll`, so on screens where all the controls (image picker,
+  thumbnails, preview, before/after switch, save button, both preset
+  dropdowns, both sliders, export format/quality, export button) add up
+  to more height than the display, everything past that point — including
+  the "Lưu ảnh này" save button and the Export button — was rendered but
+  unreachable, with no way to scroll down to it. Added
+  `Modifier.verticalScroll(rememberScrollState())`.
 - Android `MyPhotoViewModel`: a plain `Job.cancel()` doesn't stop the
   non-suspending, CPU-bound bitmap decode/render work already in flight,
   so rapidly switching photos/presets/sliders could let a slow, stale

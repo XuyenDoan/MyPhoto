@@ -92,6 +92,28 @@ applying an associated 3D LUT (`.npy`, shape `(N, N, N, 3)`). The full JSON
 schema is documented in `presets/README.md` and
 `myphoto.preset_engine.serialization`.
 
+## Export Engine
+
+`myphoto.export_engine.ExportEngine.export()` writes a processed
+`ImageBuffer` to JPEG, PNG, or TIFF:
+
+- **JPEG** is always 8-bit (the format has no higher-depth mode) and is
+  written via Pillow, which supports embedding both the ICC profile and
+  EXIF (`piexif.insert` after save).
+- **PNG/TIFF** are written via OpenCV at 16-bit/channel whenever the
+  source had more than 8 bits of precision, since Pillow cannot encode a
+  3-channel 16-bit image (`Image.fromarray` only supports single-channel
+  16-bit "I;16"). This preserves pixel precision but currently does not
+  embed ICC/EXIF for the 16-bit path — `piexif.insert` requires a
+  JPEG/TIFF layout it recognizes, which OpenCV's writer doesn't produce.
+  A future OpenImageIO or LittleCMS adapter (see Color Engine section)
+  could close this gap without changing the `ExportEngine` interface.
+
+`ExportOptions` never lets the resolved output path equal the source path
+— exporting always requires (and creates) a separate output directory.
+Filenames are built from a `rename_pattern` (`{stem}`, `{name}`, `{index}`)
+via `export_engine.naming.build_output_path`.
+
 ## Batch processing
 
 `myphoto.batch` runs exports on a `QThreadPool` with one worker per image,

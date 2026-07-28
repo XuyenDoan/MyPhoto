@@ -39,4 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Velvia, Astia, Classic Chrome, Classic Neg, Eterna, Acros, Nostalgic
   Neg, Reala Ace) — original color-style approximations, not decompiled
   proprietary algorithms.
-- 64 unit tests total; ruff and strict mypy clean.
+- `myphoto.export_engine`: `ExportEngine.export()` writes JPEG (8-bit,
+  via Pillow, with ICC + EXIF preservation) and PNG/TIFF (16-bit when the
+  source supports it, via OpenCV) to a caller-chosen output directory,
+  never overwriting the source image. `ExportOptions`/`build_output_path`
+  support quality, output folder, and a `{stem}/{name}/{index}` rename
+  pattern.
+- `myphoto.image_loader.exif_utils.extract_exif` now returns the raw
+  piexif IFD structure (instead of a flattened display dict) so EXIF can
+  round-trip correctly through export.
+- 79 unit tests total; ruff and strict mypy clean.

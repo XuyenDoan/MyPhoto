@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "myphoto"
+version = "0.1.0"
+description = "Simple, fast, high-quality Fujifilm film simulation photo processor for Windows."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.13"
+authors = [{ name = "Xuyen Doan" }]
+keywords = ["photo", "film-simulation", "fujifilm", "color-grading", "raw"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics",
+]
+
+dependencies = [
+    "PySide6",
+    "numpy",
+    "pillow",
+    "opencv-python-headless",
+    "rawpy",
+    "OpenColorIO",
+    "piexif",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "mypy",
+    "ruff",
+    "pyinstaller",
+]
+
+[project.scripts]
+myphoto = "myphoto.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true

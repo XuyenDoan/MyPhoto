@@ -1,0 +1,11 @@
+{
+  "id": "eterna",
+  "name": "Eterna (Cinema)",
+  "kind": "film_simulation",
+  "adjustments": {
+    "tone_curve": [[0.0, 0.04], [0.25, 0.28], [0.75, 0.7], [1.0, 0.94]],
+    "hsl": { "hue_shift_degrees": 0.0, "saturation_scale": 0.72, "lightness_scale": 1.0 },
+    "color_balance": { "shadows": [0.0, 0.005, 0.01] },
+    "grain": { "amount": 0.05, "size": 1.0 }
+  }
+}

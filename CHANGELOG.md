@@ -25,3 +25,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and best-effort EXIF metadata.
 - Unit tests for `core.ImageBuffer` and `image_loader` (format detection,
   8-bit/16-bit decoding, missing/unsupported/corrupt file handling).
+- `myphoto.color_engine`: `ColorAdjustments`/`ColorBalanceAdjustment`
+  parameter model (with `.scaled(strength)` for the Strength slider) and
+  `ColorPipeline`, applying White Balance, Exposure, Tone Curve, RGB
+  Curve, HSL, Color Balance, 3D LUT (Film Simulation), and Film Grain in
+  the spec's pipeline order. Color math is behind a `ColorMath` adapter
+  (Adapter Pattern), currently backed by OpenCV.
+- `myphoto.preset_engine`: `PresetLoader` (discovers `*.json` presets from
+  `presets/base_profiles/` and `presets/film_simulations/`, no hardcoding)
+  and `PresetEngine.render()` implementing the Two-Layer Preset System.
+- Shipped presets: 8 camera Base Profiles (Sony, Canon, Nikon, Fujifilm,
+  OM System, Panasonic, Leica, iPhone) and 9 Film Simulations (Provia,
+  Velvia, Astia, Classic Chrome, Classic Neg, Eterna, Acros, Nostalgic
+  Neg, Reala Ace) — original color-style approximations, not decompiled
+  proprietary algorithms.
+- 64 unit tests total; ruff and strict mypy clean.

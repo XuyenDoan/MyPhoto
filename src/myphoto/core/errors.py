@@ -24,3 +24,29 @@ class ImageDecodeError(MyPhotoError):
         self.path = path
         self.reason = reason
         super().__init__(f"Failed to decode image {path}: {reason}")
+
+
+class PresetNotFoundError(MyPhotoError):
+    """Raised when a requested preset id has no matching loaded preset."""
+
+    def __init__(self, preset_id: str) -> None:
+        self.preset_id = preset_id
+        super().__init__(f"Preset not found: {preset_id!r}")
+
+
+class PresetValidationError(MyPhotoError):
+    """Raised when a preset JSON file is malformed or fails schema validation."""
+
+    def __init__(self, path: Path, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        super().__init__(f"Invalid preset {path}: {reason}")
+
+
+class ExportError(MyPhotoError):
+    """Raised when writing an exported image fails."""
+
+    def __init__(self, path: Path, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        super().__init__(f"Failed to export image to {path}: {reason}")

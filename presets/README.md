@@ -16,5 +16,21 @@ Each preset is one of two layers, applied in order:
 These are style simulations, not reverse-engineered proprietary Fujifilm
 algorithms.
 
-The concrete JSON schema and the first set of preset files will be added
-alongside the Preset Engine implementation.
+## JSON schema
+
+See the docstring in
+[`src/myphoto/preset_engine/serialization.py`](../src/myphoto/preset_engine/serialization.py)
+for the authoritative schema. Every field is optional and defaults to a
+neutral (no-op) value, so a minimal preset is just:
+
+```json
+{ "id": "example", "name": "Example", "kind": "film_simulation" }
+```
+
+An optional `"lut"` field names a NumPy `.npy` file (shape `(N, N, N, 3)`,
+values in `[0, 1]`), resolved relative to the preset's own file, applied as
+a 3D LUT after the parametric adjustments.
+
+The `PresetLoader` (`myphoto.preset_engine.PresetLoader`) discovers every
+`*.json` file in `base_profiles/` and `film_simulations/` at startup —
+nothing is hardcoded, and adding a new preset is just adding a new file.

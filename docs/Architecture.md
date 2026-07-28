@@ -82,9 +82,15 @@ throughout the codebase.
    Ace) on top of the normalized image. These are original simulations of
    a visual style, not decompiled/copied proprietary algorithms.
 
-Presets are plain JSON files loaded at runtime from `presets/` (and later a
-user presets directory) — never hardcoded. The JSON schema will be defined
-alongside the Preset Engine implementation and documented here.
+Presets are plain JSON files loaded at runtime from `presets/base_profiles/`
+and `presets/film_simulations/` (and later a user presets directory) —
+never hardcoded. `PresetLoader` scans both directories for `*.json` files;
+`PresetEngine.render()` runs an image through the Base Profile's adjustments
+via `ColorPipeline`, then through the Film Simulation's adjustments (scaled
+by the UI's Strength value via `ColorAdjustments.scaled()`), optionally
+applying an associated 3D LUT (`.npy`, shape `(N, N, N, 3)`). The full JSON
+schema is documented in `presets/README.md` and
+`myphoto.preset_engine.serialization`.
 
 ## Batch processing
 

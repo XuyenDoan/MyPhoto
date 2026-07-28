@@ -1,0 +1,11 @@
+{
+  "id": "astia",
+  "name": "Astia (Soft)",
+  "kind": "film_simulation",
+  "adjustments": {
+    "tone_curve": [[0.0, 0.02], [0.25, 0.26], [0.75, 0.75], [1.0, 0.98]],
+    "hsl": { "hue_shift_degrees": 1.0, "saturation_scale": 1.02, "lightness_scale": 1.02 },
+    "color_balance": { "shadows": [0.005, 0.0, 0.0], "midtones": [0.01, 0.0, 0.0] },
+    "grain": { "amount": 0.04, "size": 1.0 }
+  }
+}

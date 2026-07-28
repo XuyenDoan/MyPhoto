@@ -1,0 +1,10 @@
+{
+  "id": "acros",
+  "name": "Acros (Monochrome)",
+  "kind": "film_simulation",
+  "adjustments": {
+    "tone_curve": [[0.0, 0.0], [0.25, 0.19], [0.75, 0.82], [1.0, 1.0]],
+    "hsl": { "hue_shift_degrees": 0.0, "saturation_scale": 0.0, "lightness_scale": 1.0 },
+    "grain": { "amount": 0.12, "size": 0.8 }
+  }
+}

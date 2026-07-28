@@ -1,0 +1,14 @@
+{
+  "id": "classic_neg",
+  "name": "Classic Neg",
+  "kind": "film_simulation",
+  "adjustments": {
+    "tone_curve": [[0.0, 0.01], [0.25, 0.21], [0.75, 0.79], [1.0, 0.99]],
+    "hsl": { "hue_shift_degrees": -3.0, "saturation_scale": 0.9, "lightness_scale": 1.0 },
+    "color_balance": {
+      "shadows": [-0.01, 0.0, 0.015],
+      "highlights": [0.015, 0.005, -0.01]
+    },
+    "grain": { "amount": 0.18, "size": 1.2 }
+  }
+}

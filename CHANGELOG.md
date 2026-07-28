@@ -54,4 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `myphoto.batch`: `BatchJob`/`BatchItemResult`/`BatchProcessor`, running
   batch export on a `QThreadPool` with per-item progress and cooperative
   cancellation, without blocking the UI thread.
-- 87 unit tests total; ruff and strict mypy clean.
+- `PresetEngine.render()` gains a `grain_amount` override, independent of
+  `strength`, backing a separate Film Grain slider; `BatchJob` gained the
+  matching `grain_amount` field.
+- `myphoto.workflow.EditSession`: the GUI-facing orchestrator — image
+  list management, current preset/strength/grain state,
+  `render_preview()` (downsampled for interactive speed) and
+  `export_all()` (delegates to `BatchProcessor` at full resolution).
+- 98 unit tests total; ruff and strict mypy clean.

@@ -114,6 +114,29 @@ schema is documented in `presets/README.md` and
 Filenames are built from a `rename_pattern` (`{stem}`, `{name}`, `{index}`)
 via `export_engine.naming.build_output_path`.
 
+## Workflow
+
+`myphoto.workflow.EditSession` is the single object the GUI reads from and
+calls into — it owns the imported image list, current selection, and
+current Base Profile/Film Simulation/Strength/Grain state, and wires a
+`PresetEngine` + `BatchProcessor` together:
+
+- `render_preview()` loads the selected image, downsamples it
+  (`workflow.preview.downscaled`, longer side capped at 1600px) for
+  interactive speed, runs it through `PresetEngine.render()`, and emits
+  `preview_ready(original, rendered)` or `preview_failed(message)` — this
+  is what backs the Before/After view.
+- `export_all(export_options)` builds a `BatchJob` from the full image
+  list and current settings and hands it to `BatchProcessor`, forwarding
+  its `progress`/`item_finished`/`finished` signals. Batch export always
+  processes full-resolution buffers; only the preview is downsampled.
+
+The `Strength` slider scales the film simulation's whole adjustment set
+(`ColorAdjustments.scaled()`); the `Film Grain` slider is independent —
+`PresetEngine.render(..., grain_amount=...)` overrides the final grain
+intensity after strength scaling, so a user can dial grain up or down
+without changing how strongly the rest of the look is applied.
+
 ## Batch processing
 
 `myphoto.batch.BatchProcessor` runs a `BatchJob` (source images + preset +

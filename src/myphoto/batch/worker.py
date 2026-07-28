@@ -45,7 +45,11 @@ class BatchItemRunnable(QRunnable):
         try:
             buffer = self._image_loader.load(source_path)
             rendered = self._preset_engine.render(
-                buffer, self._job.base_profile_id, self._job.film_simulation_id, self._job.strength
+                buffer,
+                self._job.base_profile_id,
+                self._job.film_simulation_id,
+                self._job.strength,
+                grain_amount=self._job.grain_amount,
             )
             output_path = self._export_engine.export(
                 rendered, self._job.export_options, index=self._index

@@ -17,6 +17,7 @@ class BatchJob:
     film_simulation_id: str
     strength: float
     export_options: ExportOptions
+    grain_amount: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

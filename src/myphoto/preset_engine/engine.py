@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
 from myphoto.color_engine.pipeline import ColorPipeline
@@ -24,20 +26,26 @@ class PresetEngine:
         base_profile_id: str,
         film_simulation_id: str,
         strength: float = 1.0,
+        grain_amount: float | None = None,
         rng: np.random.Generator | None = None,
     ) -> ImageBuffer:
         """Return ``buffer`` normalized by ``base_profile_id`` then styled by
         ``film_simulation_id`` at the given ``strength`` (0.0-1.0).
+
+        ``grain_amount``, if given, overrides the film simulation's grain
+        intensity (0.0-1.0) independently of ``strength`` — it backs the
+        UI's separate Film Grain slider.
         """
         base_profile = self._loader.get_base_profile(base_profile_id)
         film_simulation = self._loader.get_film_simulation(film_simulation_id)
 
         normalized = self._pipeline.process(buffer, base_profile.adjustments, rng=rng)
 
+        adjustments = film_simulation.adjustments.scaled(strength)
+        if grain_amount is not None:
+            adjustments = replace(adjustments, grain_amount=grain_amount)
+
         lut = np.load(film_simulation.lut_path) if film_simulation.lut_path is not None else None
         return self._pipeline.process(
-            normalized,
-            film_simulation.adjustments.scaled(strength),
-            film_simulation_lut=lut,
-            rng=rng,
+            normalized, adjustments, film_simulation_lut=lut, rng=rng
         )

@@ -47,6 +47,23 @@ def test_strength_scales_the_effect(loader: PresetLoader, buffer: ImageBuffer) -
     np.testing.assert_allclose(none.data, base_only.data)
 
 
+def test_grain_amount_overrides_preset_independently_of_strength(
+    loader: PresetLoader, buffer: ImageBuffer
+) -> None:
+    engine = PresetEngine(loader)
+
+    no_grain = engine.render(
+        buffer, "fujifilm", "classic_neg", strength=1.0, grain_amount=0.0,
+        rng=np.random.default_rng(0),
+    )
+    with_grain = engine.render(
+        buffer, "fujifilm", "classic_neg", strength=1.0, grain_amount=0.9,
+        rng=np.random.default_rng(0),
+    )
+
+    assert with_grain.data.std() > no_grain.data.std()
+
+
 def test_unknown_base_profile_raises(loader: PresetLoader, buffer: ImageBuffer) -> None:
     from myphoto.core.errors import PresetNotFoundError
 

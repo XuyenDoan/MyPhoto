@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -58,6 +59,7 @@ fun MyPhotoScreen(
     onFilmSimulationSelected: (String) -> Unit,
     onStrengthChanged: (Float) -> Unit,
     onGrainChanged: (Float) -> Unit,
+    onGrainEnabledChanged: (Boolean) -> Unit,
     onShowOriginalChanged: (Boolean) -> Unit,
     onExportClicked: (ExportOptions) -> Unit,
     onCancelExport: () -> Unit,
@@ -141,11 +143,16 @@ fun MyPhotoScreen(
                 onValueChange = onStrengthChanged,
                 valueLabel = "${(state.strength * 100).toInt()}%",
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = state.grainEnabled, onCheckedChange = onGrainEnabledChanged)
+                Text("Thêm hạt phim (Film Grain)")
+            }
             LabeledSlider(
                 label = "Film Grain",
                 value = state.grainAmount,
                 onValueChange = onGrainChanged,
                 valueLabel = "${(state.grainAmount * 100).toInt()}%",
+                enabled = state.grainEnabled,
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -250,12 +257,13 @@ private fun LabeledSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueLabel: String,
+    enabled: Boolean = true,
 ) {
     Column {
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Text(label, style = MaterialTheme.typography.labelLarge)
             Text(valueLabel, style = MaterialTheme.typography.labelLarge)
         }
-        Slider(value = value, onValueChange = onValueChange, valueRange = 0f..1f)
+        Slider(value = value, onValueChange = onValueChange, valueRange = 0f..1f, enabled = enabled)
     }
 }

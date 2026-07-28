@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
                     onFilmSimulationSelected = viewModel::setFilmSimulation,
                     onStrengthChanged = viewModel::setStrength,
                     onGrainChanged = viewModel::setGrainAmount,
+                    onGrainEnabledChanged = viewModel::setGrainEnabled,
                     onShowOriginalChanged = viewModel::setShowOriginal,
                     onExportClicked = { options: ExportOptions -> viewModel.exportAll(options) },
                     onCancelExport = viewModel::cancelExport,

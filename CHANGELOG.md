@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Android "Lưu ảnh này" / Export were silently failing on real phone
+  photos (reported as "Lưu ảnh thất bại" / "Export finished: 0/N"): the
+  color pipeline runs two full passes (base profile + film simulation) of
+  up to 7 stages each, and every non-neutral stage allocates a fresh
+  full-size float32 3-channel buffer. Exporting decoded the source photo
+  at full resolution (`maxDimension = null`), so a modern phone photo
+  (12-108MP) could transiently need hundreds of MB to a few GB of buffers
+  — an `OutOfMemoryError`, caught and reported as a failed item rather
+  than crashing. Capped the export decode at `EXPORT_MAX_DIMENSION = 2560`
+  (still far higher fidelity than the on-screen preview) to keep peak
+  memory bounded.
+
+### Added
+
+- Android: a "Thêm hạt phim (Film Grain)" checkbox next to the Film Grain
+  slider, so grain can be turned off entirely for photos where it's not
+  wanted, independent of the slider's saved amount (previously grain was
+  always applied at whatever the slider was set to, defaulting to 50%).
+
+### Fixed
+
 - Android `MyPhotoScreen`: the main content `Column` had no
   `verticalScroll`, so on screens where all the controls (image picker,
   thumbnails, preview, before/after switch, save button, both preset

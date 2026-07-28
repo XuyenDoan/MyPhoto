@@ -37,6 +37,7 @@ data class UiState(
     val filmSimulationId: String = "provia",
     val strength: Float = 1f,
     val grainAmount: Float = 0.5f,
+    val grainEnabled: Boolean = true,
     val showOriginal: Boolean = false,
     val originalPreview: Bitmap? = null,
     val renderedPreview: Bitmap? = null,
@@ -44,7 +45,10 @@ data class UiState(
     val isExporting: Boolean = false,
     val exportProgress: Pair<Int, Int>? = null,
     val statusMessage: String? = null,
-)
+) {
+    /** The grain amount actually applied — 0 when the grain checkbox is off, regardless of the slider. */
+    val effectiveGrainAmount: Float get() = if (grainEnabled) grainAmount else 0f
+}
 
 /**
  * The GUI-facing orchestrator for the Android app — the equivalent of
@@ -129,6 +133,11 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
         schedulePreview()
     }
 
+    fun setGrainEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(grainEnabled = enabled) }
+        schedulePreview()
+    }
+
     fun setShowOriginal(show: Boolean) {
         _uiState.update { it.copy(showOriginal = show) }
     }
@@ -165,7 +174,7 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
                 val bitmap = BitmapConversions.decodeBitmap(resolver, uri, maxDimension = PREVIEW_MAX_DIMENSION)
                 val buffer = BitmapConversions.bitmapToImageBuffer(bitmap)
                 val renderedBuffer = presetEngine.render(
-                    buffer, state.baseProfileId, state.filmSimulationId, state.strength, state.grainAmount
+                    buffer, state.baseProfileId, state.filmSimulationId, state.strength, state.effectiveGrainAmount
                 )
                 bitmap to BitmapConversions.imageBufferToBitmap(renderedBuffer)
             }
@@ -257,11 +266,11 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
         val application = getApplication<Application>()
         return try {
             withContext(Dispatchers.Default) {
-                val bitmap = BitmapConversions.decodeBitmap(application.contentResolver, uri, maxDimension = null)
+                val bitmap = BitmapConversions.decodeBitmap(application.contentResolver, uri, maxDimension = EXPORT_MAX_DIMENSION)
                 val buffer = BitmapConversions.bitmapToImageBuffer(bitmap)
                 bitmap.recycle() // free the full-resolution source before rendering allocates more
                 val rendered = presetEngine.render(
-                    buffer, state.baseProfileId, state.filmSimulationId, state.strength, state.grainAmount
+                    buffer, state.baseProfileId, state.filmSimulationId, state.strength, state.effectiveGrainAmount
                 )
                 val renderedBitmap = BitmapConversions.imageBufferToBitmap(rendered)
                 MediaStoreExporter.export(application, renderedBitmap, displayName, options)
@@ -281,9 +290,19 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
         // Smaller than a typical phone screen's width, deliberately: keeps
         // each preview render's transient memory use low (this pipeline
         // allocates a fresh buffer per color stage) so repeated fast preset/
-        // photo switching doesn't run the app out of heap. Export always
-        // re-decodes and renders at full resolution regardless of this.
+        // photo switching doesn't run the app out of heap.
         const val PREVIEW_MAX_DIMENSION = 1024
+
+        // The color pipeline runs two full passes (base profile + film
+        // simulation) of up to 7 stages each, and every non-neutral stage
+        // allocates a fresh float32 3-channel buffer the size of the image.
+        // Decoding a modern phone photo (12-108MP) at full resolution for
+        // export could transiently need several hundred MB to a few GB of
+        // buffers, which is why "save"/"export" were silently failing
+        // (OutOfMemoryError, caught and reported as failure) on real photos.
+        // Capping the export decode at this size keeps peak memory bounded
+        // while still being far higher fidelity than the on-screen preview.
+        const val EXPORT_MAX_DIMENSION = 2560
         const val PREVIEW_DEBOUNCE_MS = 150L
     }
 }

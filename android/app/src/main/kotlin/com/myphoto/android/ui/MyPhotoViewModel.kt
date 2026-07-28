@@ -14,6 +14,7 @@ import com.myphoto.android.presets.AssetPresetSource
 import com.myphoto.core.Preset
 import com.myphoto.core.PresetEngine
 import com.myphoto.core.PresetLoader
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 
 data class UiState(
     val images: List<Uri> = emptyList(),
@@ -66,6 +68,18 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
 
     private var previewJob: Job? = null
     private var exportJob: Job? = null
+
+    /**
+     * Bumped on every [schedulePreview] call. [renderPreview] only applies its
+     * result if it's still the most recent request when it finishes — plain
+     * `Job.cancel()` doesn't stop the non-suspending, CPU-bound decode/render
+     * work already in flight, so without this check a slow, stale render
+     * (e.g. from a preset picked a moment ago) could finish *after* a newer
+     * one and clobber the state with the wrong image — the most likely cause
+     * of "picking a new preset doesn't visibly re-color the photo" when
+     * switching quickly.
+     */
+    private val previewRequestId = AtomicLong(0)
 
     init {
         viewModelScope.launch {
@@ -132,13 +146,14 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
 
     private fun schedulePreview() {
         previewJob?.cancel()
+        val requestId = previewRequestId.incrementAndGet()
         previewJob = viewModelScope.launch {
             delay(PREVIEW_DEBOUNCE_MS) // mirrors the desktop app's 150ms QTimer debounce
-            renderPreview()
+            renderPreview(requestId)
         }
     }
 
-    private suspend fun renderPreview() {
+    private suspend fun renderPreview(requestId: Long) {
         val state = _uiState.value
         val index = state.selectedIndex ?: return
         val uri = state.images.getOrNull(index) ?: return
@@ -154,9 +169,23 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
                 )
                 bitmap to BitmapConversions.imageBufferToBitmap(renderedBuffer)
             }
+
+            if (requestId != previewRequestId.get()) {
+                // A newer preview was requested while this one was rendering —
+                // discard this stale result instead of overwriting a fresher one.
+                original.recycle()
+                rendered.recycle()
+                return
+            }
             _uiState.update { it.copy(originalPreview = original, renderedPreview = rendered, isRendering = false) }
-        } catch (exc: Exception) {
-            _uiState.update { it.copy(isRendering = false, statusMessage = "Preview failed: ${exc.message}") }
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            // Catching Throwable (not just Exception) matters here: an
+            // OutOfMemoryError from decoding a large bitmap is an Error, not
+            // an Exception, and an uncaught one inside a coroutine crashes
+            // the whole app rather than just failing this one preview.
+            _uiState.update { it.copy(isRendering = false, statusMessage = "Preview failed: ${t.message}") }
         }
     }
 
@@ -177,16 +206,21 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
                     withContext(Dispatchers.Default) {
                         val bitmap = BitmapConversions.decodeBitmap(application.contentResolver, uri, maxDimension = null)
                         val buffer = BitmapConversions.bitmapToImageBuffer(bitmap)
+                        bitmap.recycle() // free the full-resolution source before rendering allocates more
                         val rendered = presetEngine.render(
                             buffer, state.baseProfileId, state.filmSimulationId, state.strength, state.grainAmount
                         )
                         val renderedBitmap = BitmapConversions.imageBufferToBitmap(rendered)
                         val name = "myphoto_${System.currentTimeMillis()}_$index"
                         MediaStoreExporter.export(application, renderedBitmap, name, options)
+                        renderedBitmap.recycle()
                     }
                     succeeded++
-                } catch (exc: Exception) {
-                    // A single failed item doesn't abort the batch — mirrors the desktop BatchProcessor.
+                } catch (ce: CancellationException) {
+                    throw ce
+                } catch (t: Throwable) {
+                    // A single failed item (including an OutOfMemoryError on a huge
+                    // photo) doesn't abort the batch — mirrors the desktop BatchProcessor.
                 }
                 _uiState.update { it.copy(exportProgress = (index + 1) to images.size) }
             }

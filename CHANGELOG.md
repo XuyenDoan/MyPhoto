@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Android `MyPhotoViewModel`: a plain `Job.cancel()` doesn't stop the
+  non-suspending, CPU-bound bitmap decode/render work already in flight,
+  so rapidly switching photos/presets/sliders could let a slow, stale
+  preview finish *after* a newer one and overwrite it with the wrong
+  image. Added a monotonically increasing request-id check so a preview
+  render is only ever applied if it's still the most recent request.
+- Both `renderPreview()` and the per-item export loop only caught
+  `Exception`, so an `OutOfMemoryError` from decoding a large bitmap
+  (an `Error`, not an `Exception`) went uncaught and crashed the whole
+  app — most likely to surface exactly when interacting quickly/
+  repeatedly (multiple overlapping decodes piling up in memory). Now
+  catches `Throwable` (rethrowing `CancellationException` so cancelling
+  a job still works correctly) and surfaces a status message instead of
+  crashing. Also recycle intermediate/discarded bitmaps (a stale
+  preview's result, and the source/rendered bitmaps used mid-export)
+  to reduce peak memory rather than waiting on GC.
+
 ### Added
 
 - **Android app** (`android/`), a native Kotlin/Jetpack Compose companion

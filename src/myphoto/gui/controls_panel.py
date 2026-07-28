@@ -36,6 +36,7 @@ class ControlsPanel(QWidget):
     #: Emits the *effective* grain amount: 0.0 whenever the grain checkbox
     #: is unchecked, regardless of the slider's saved position.
     grain_settings_changed = Signal(float)
+    auto_suggest_toggled = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -47,6 +48,18 @@ class ControlsPanel(QWidget):
         self._film_simulation_combo.currentIndexChanged.connect(
             self._emit_film_simulation_changed
         )
+
+        # Off by default: manual preset selection stays the norm. This is a
+        # heuristic (color statistics), not a trained model — see
+        # preset_engine.auto_suggest.
+        self._auto_suggest_checkbox = QCheckBox("Auto-suggest Film Simulation (beta)", self)
+        self._auto_suggest_checkbox.setChecked(False)
+        self._auto_suggest_checkbox.setToolTip(
+            "Picks a Film Simulation from the photo's color statistics "
+            "(warmth, saturation, contrast, skin/foliage/sky content) — "
+            "not AI/machine learning, just a fast starting guess."
+        )
+        self._auto_suggest_checkbox.toggled.connect(self._on_auto_suggest_toggled)
 
         self._strength_slider = self._percent_slider(default=100)
         self._strength_slider.valueChanged.connect(
@@ -67,6 +80,7 @@ class ControlsPanel(QWidget):
         preset_form = QFormLayout(preset_group)
         preset_form.addRow("Base Profile", self._base_profile_combo)
         preset_form.addRow("Film Simulation", self._film_simulation_combo)
+        preset_form.addRow(self._auto_suggest_checkbox)
         preset_form.addRow("Strength", self._strength_slider)
         preset_form.addRow(self._grain_checkbox)
         preset_form.addRow("Film Grain", self._grain_slider)
@@ -141,6 +155,12 @@ class ControlsPanel(QWidget):
         data: str | None = self._film_simulation_combo.currentData()
         return data
 
+    def set_current_film_simulation(self, preset_id: str) -> None:
+        """Programmatically move the dropdown (e.g. from auto-suggest) without re-emitting the change."""
+        self._film_simulation_combo.blockSignals(True)
+        self._select_combo_data(self._film_simulation_combo, preset_id)
+        self._film_simulation_combo.blockSignals(False)
+
     def effective_grain_amount(self) -> float:
         """0.0 when the grain checkbox is unchecked, else the slider's value."""
         return self._grain_slider.value() / 100.0 if self._grain_checkbox.isChecked() else 0.0
@@ -167,6 +187,10 @@ class ControlsPanel(QWidget):
         preset_id = self.selected_film_simulation_id()
         if preset_id:
             self.film_simulation_changed.emit(preset_id)
+
+    def _on_auto_suggest_toggled(self, checked: bool) -> None:
+        self._film_simulation_combo.setEnabled(not checked)
+        self.auto_suggest_toggled.emit(checked)
 
     def _on_grain_checkbox_toggled(self, checked: bool) -> None:
         self._grain_slider.setEnabled(checked)

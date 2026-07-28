@@ -94,6 +94,23 @@ def test_render_preview_failure_emits_preview_failed(session: EditSession, tmp_p
     assert blocker.args[0]
 
 
+def test_auto_suggest_updates_film_simulation_and_emits_signal(
+    session: EditSession, tmp_path: Path, qtbot
+) -> None:
+    path = tmp_path / "portrait.png"
+    skin_tone = np.tile(np.array([204, 153, 128], dtype=np.uint8), (8, 8, 1))
+    Image.fromarray(skin_tone, mode="RGB").save(path)
+    session.add_images([path])
+    session.film_simulation_id = "velvia"  # deliberately not what auto-suggest should pick
+    session.auto_suggest_enabled = True
+
+    with qtbot.waitSignal(session.film_simulation_suggested, timeout=2000) as blocker:
+        session.render_preview()
+
+    assert blocker.args[0] == "astia"
+    assert session.film_simulation_id == "astia"
+
+
 def test_export_all_forwards_batch_finished(session: EditSession, tmp_path: Path, qtbot) -> None:
     path = tmp_path / "photo.png"
     _make_image(path)

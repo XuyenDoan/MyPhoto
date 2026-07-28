@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added (Desktop) — Auto-suggest Film Simulation
+
+- A new "Auto-suggest Film Simulation (beta)" checkbox (off by default).
+  When enabled, `EditSession.render_preview()` analyzes the loaded photo's
+  color statistics (`preset_engine.auto_suggest`: overall warmth,
+  brightness, contrast, mean saturation, and the fraction of pixels that
+  look like skin tones / foliage / sky) and picks whichever shipped Film
+  Simulation preset best fits that scenario (e.g. Velvia for saturated
+  nature/landscape shots, Astia for portraits, Acros for high-contrast
+  desaturated scenes). This is a deterministic rule-based heuristic, not a
+  trained ML model or a cloud API call — no new dependency, runs instantly,
+  fully offline, and always overridable (unchecking it hands the dropdown
+  back to manual control).
+
 ### Fixed (Desktop)
 
 - `ImageLoader` didn't apply EXIF orientation when decoding JPEG/TIFF —

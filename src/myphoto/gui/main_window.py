@@ -109,10 +109,14 @@ class MainWindow(QMainWindow):
         self._controls_panel.film_simulation_changed.connect(self._on_film_simulation_changed)
         self._controls_panel.strength_changed.connect(self._on_strength_changed)
         self._controls_panel.grain_settings_changed.connect(self._on_grain_changed)
+        self._controls_panel.auto_suggest_toggled.connect(self._on_auto_suggest_toggled)
 
         self._session.images_changed.connect(self._on_session_images_changed)
         self._session.preview_ready.connect(self._on_preview_ready)
         self._session.preview_failed.connect(self._on_preview_failed)
+        self._session.film_simulation_suggested.connect(
+            self._controls_panel.set_current_film_simulation
+        )
         self._session.batch_progress.connect(self._on_batch_progress)
         self._session.batch_finished.connect(self._on_batch_finished)
 
@@ -161,6 +165,10 @@ class MainWindow(QMainWindow):
 
     def _on_grain_changed(self, grain_amount: float) -> None:
         self._session.grain_amount = grain_amount
+        self._schedule_preview()
+
+    def _on_auto_suggest_toggled(self, enabled: bool) -> None:
+        self._session.auto_suggest_enabled = enabled
         self._schedule_preview()
 
     def _schedule_preview(self) -> None:

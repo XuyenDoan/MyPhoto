@@ -126,9 +126,10 @@ current Base Profile/Film Simulation/Strength/Grain state, and wires a
 
 - `render_preview()` loads the selected image, downsamples it
   (`workflow.preview.downscaled`, longer side capped at 1600px) for
-  interactive speed, runs it through `PresetEngine.render()`, and emits
-  `preview_ready(original, rendered)` or `preview_failed(message)` — this
-  is what backs the Before/After view.
+  interactive speed, optionally re-picks `film_simulation_id` when
+  `auto_suggest_enabled` is set (see below), runs it through
+  `PresetEngine.render()`, and emits `preview_ready(original, rendered)` or
+  `preview_failed(message)` — this is what backs the Before/After view.
 - `export_all(export_options)` builds a `BatchJob` from the full image
   list and current settings and hands it to `BatchProcessor`, forwarding
   its `progress`/`item_finished`/`finished` signals. Batch export always
@@ -139,6 +140,25 @@ The `Strength` slider scales the film simulation's whole adjustment set
 `PresetEngine.render(..., grain_amount=...)` overrides the final grain
 intensity after strength scaling, so a user can dial grain up or down
 without changing how strongly the rest of the look is applied.
+
+### Auto-suggest Film Simulation
+
+`preset_engine.auto_suggest.suggest_film_simulation_id()` is a
+deterministic, rule-based heuristic — not a trained ML model, no bundled
+weights, nothing sent over the network. It computes simple statistics from
+the loaded image (mean warmth, brightness, contrast, mean saturation, and
+the fraction of pixels that fall in typical skin-tone/foliage/sky hue
+ranges, via `OpenCVColorMath.rgb_to_hls`) and scores each shipped Film
+Simulation against the scenario it's meant to flatter (e.g. Velvia for
+saturated nature shots, Astia for portraits, Acros for high-contrast
+desaturated scenes), returning the highest-scoring one that's actually
+available. `EditSession.auto_suggest_enabled` (off by default) gates
+whether `render_preview()` calls it; when it changes `film_simulation_id`,
+`film_simulation_suggested(str)` fires so `ControlsPanel` can move its
+dropdown to match. This is a fast, offline, always-overridable starting
+point — not a claim of "correctness"; a real learned scene classifier
+(local ONNX model or a cloud vision API) is a substantially larger project
+and was deliberately left out of scope here.
 
 ## Batch processing
 
@@ -181,9 +201,10 @@ runnable (and the Qt signal object it owns) mid-emit and crash.
   render tall and landscape photos render wide, instead of a fixed-shape
   crop), with Ctrl+wheel zooming further in/out from that fitted baseline.
 - `ControlsPanel` (right) — Base Profile / Film Simulation dropdowns
-  (populated from `PresetLoader`), a Strength slider, a Film Grain
-  checkbox (off by default) + amount slider, and the export destination
-  fields (format, quality, output folder).
+  (populated from `PresetLoader`), an Auto-suggest Film Simulation
+  checkbox (off by default; disables the dropdown while on), a Strength
+  slider, a Film Grain checkbox (off by default) + amount slider, and the
+  export destination fields (format, quality, output folder).
 - A bottom bar — progress bar, Cancel, and Export buttons.
 - `myphoto.gui.theme` applies a dark Fusion palette + QSS stylesheet
   application-wide (accent color, styled group boxes/buttons/sliders/

@@ -13,6 +13,7 @@ from myphoto.batch.processor import BatchProcessor
 from myphoto.export_engine.models import ExportOptions
 from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
+from myphoto.preset_engine.auto_suggest import suggest_film_simulation_id
 from myphoto.preset_engine.engine import PresetEngine
 from myphoto.preset_engine.loader import PresetLoader
 from myphoto.preset_engine.models import Preset
@@ -25,6 +26,9 @@ class EditSession(QObject):
     images_changed = Signal()
     preview_ready = Signal(object, object)  # (original: ImageBuffer, rendered: ImageBuffer)
     preview_failed = Signal(str)
+    #: Emitted when auto-suggest picks a different Film Simulation than the
+    #: one currently set, so the UI's dropdown can reflect it.
+    film_simulation_suggested = Signal(str)
     batch_progress = Signal(int, int)
     batch_item_finished = Signal(object)
     batch_finished = Signal(list)
@@ -66,6 +70,10 @@ class EditSession(QObject):
         self.film_simulation_id = "provia"
         self.strength = 1.0
         self.grain_amount: float | None = None
+        #: When enabled, each `render_preview()` re-picks `film_simulation_id`
+        #: via a heuristic (not ML) scene analysis of the loaded image —
+        #: see `preset_engine.auto_suggest`.
+        self.auto_suggest_enabled = False
 
     def list_base_profiles(self) -> list[Preset]:
         return self._preset_loader.list_base_profiles()
@@ -107,6 +115,12 @@ class EditSession(QObject):
         source_path = self.image_paths[self.current_index]
         try:
             original = downscaled(self._image_loader.load(source_path), self.PREVIEW_MAX_DIMENSION)
+            if self.auto_suggest_enabled:
+                available_ids = {preset.id for preset in self._preset_loader.list_film_simulations()}
+                suggested_id = suggest_film_simulation_id(original, available_ids)
+                if suggested_id != self.film_simulation_id:
+                    self.film_simulation_id = suggested_id
+                    self.film_simulation_suggested.emit(suggested_id)
             rendered = self._preset_engine.render(
                 original,
                 self.base_profile_id,

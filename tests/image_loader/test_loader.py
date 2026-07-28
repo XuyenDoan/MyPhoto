@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import piexif
 import pytest
 from PIL import Image
 
@@ -42,6 +43,23 @@ def test_loads_16bit_tiff(tmp_path: Path) -> None:
     assert buffer.bit_depth == 16
     assert buffer.data.max() <= 1.0
     assert buffer.data.min() >= 0.0
+
+
+def test_applies_exif_orientation_for_portrait_phone_photos(tmp_path: Path) -> None:
+    # Sensor-orientation pixels: a wide (landscape) array, exactly what a
+    # phone held in portrait writes to disk, tagged with the EXIF
+    # Orientation the phone also writes so viewers rotate it 90 degrees CW.
+    path = tmp_path / "portrait.jpg"
+    array = np.zeros((8, 12, 3), dtype=np.uint8)
+    array[:, :6] = (255, 0, 0)  # left half red, right half black
+    exif_bytes = piexif.dump({"0th": {piexif.ImageIFD.Orientation: 6}, "Exif": {}, "GPS": {}, "1st": {}})
+    Image.fromarray(array, mode="RGB").save(path, exif=exif_bytes)
+
+    buffer = ImageLoader().load(path)
+
+    # Rotating a 12x8 (wide) image 90 degrees CW yields an 8x12 (tall) one.
+    assert buffer.data.shape == (12, 8, 3)
+    assert buffer.exif["0th"][piexif.ImageIFD.Orientation] == 1
 
 
 def test_missing_file_raises(tmp_path: Path) -> None:

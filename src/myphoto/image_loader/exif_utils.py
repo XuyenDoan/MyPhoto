@@ -30,3 +30,16 @@ def extract_exif(path: Path) -> dict[str, Any]:
     except Exception:  # noqa: BLE001 - piexif raises undocumented types for non-EXIF files.
         return dict(EMPTY_EXIF)
     return raw_exif
+
+
+def normalize_orientation(exif: dict[str, Any]) -> None:
+    """Reset the Orientation tag to 1 (normal), in place.
+
+    Call this after the pixel data has already been physically rotated to
+    match the original Orientation tag (see
+    ``image_loader.loader._load_raster``) — otherwise re-exporting this
+    EXIF as-is would tell viewers to rotate an image that's already
+    right-side up, flipping/rotating it a second time.
+    """
+    if piexif.ImageIFD.Orientation in exif.get("0th", {}):
+        exif["0th"][piexif.ImageIFD.Orientation] = 1

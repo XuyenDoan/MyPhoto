@@ -6,11 +6,11 @@ from pathlib import Path
 
 import numpy as np
 import rawpy
-from PIL import Image
+from PIL import Image, ImageOps
 
 from myphoto.core.errors import ImageDecodeError, UnsupportedFormatError
 from myphoto.core.image import ImageBuffer
-from myphoto.image_loader.exif_utils import extract_exif
+from myphoto.image_loader.exif_utils import extract_exif, normalize_orientation
 from myphoto.image_loader.formats import is_raster, is_raw
 
 #: 16-bit-per-channel Pillow modes produced by TIFF/PNG decoding.
@@ -49,11 +49,22 @@ class ImageLoader:
             with Image.open(path) as img:
                 img.load()
                 icc_profile: bytes | None = img.info.get("icc_profile")
-                data, bit_depth = _pillow_image_to_array(img)
+                # Camera/phone JPEGs commonly store sensor-orientation pixels
+                # (often landscape) plus an EXIF Orientation tag saying how
+                # to rotate/flip them for display — a portrait shot decodes
+                # as a landscape array unless that's applied here.
+                transposed = ImageOps.exif_transpose(img)
+                data, bit_depth = _pillow_image_to_array(transposed if transposed is not None else img)
         except UnsupportedFormatError:
             raise
         except Exception as exc:  # Pillow raises many different exception types.
             raise ImageDecodeError(path, str(exc)) from exc
+
+        exif = extract_exif(path)
+        # The pixel data above is already correctly oriented; keeping the
+        # original tag would tell viewers to rotate an already-correct
+        # export a second time.
+        normalize_orientation(exif)
 
         return ImageBuffer(
             data=data,
@@ -62,7 +73,7 @@ class ImageLoader:
             bit_depth=bit_depth,
             is_raw=False,
             icc_profile=icc_profile,
-            exif=extract_exif(path),
+            exif=exif,
         )
 
     def _load_raw(self, path: Path) -> ImageBuffer:

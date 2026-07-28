@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (Desktop)
+
+- `ImageLoader` didn't apply EXIF orientation when decoding JPEG/TIFF —
+  phone/camera photos commonly store sensor-orientation pixels (often
+  landscape) plus an EXIF `Orientation` tag telling viewers how to rotate
+  them; without applying that tag, a portrait photo decoded (and
+  previewed/exported) as landscape. Fixed via `PIL.ImageOps.exif_transpose`
+  on load, and the stored EXIF's `Orientation` tag is reset to "normal" so
+  re-exporting it doesn't tell other viewers to rotate an already-correct
+  image a second time.
+
 ### Changed (Desktop)
 
 - `PreviewPanel` now fits the image to the available viewport by default

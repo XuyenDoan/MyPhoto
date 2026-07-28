@@ -16,10 +16,15 @@ Just:
 - Before/After preview with zoom
 - Two-layer preset system: camera **Base Profile** normalization, then a
   **Film Simulation** look (Provia, Velvia, Astia, Classic Chrome,
-  Classic Neg, Eterna, Acros, Nostalgic Neg, Reala Ace)
-- Adjustable simulation **Strength** and **Film Grain**
-- Batch export to JPEG/PNG/TIFF with quality, export folder, and rename
-  pattern controls — never overwrites the original
+  Classic Neg, PRO Neg. Hi, PRO Neg. Std, Eterna, Eterna Bleach Bypass,
+  Acros, Sepia, Nostalgic Neg, Reala Ace)
+- Adjustable simulation **Strength**; **Film Grain** is opt-in via a
+  checkbox (off by default) plus an amount slider
+- Batch export to JPEG/PNG/TIFF with quality and export folder controls,
+  running in parallel across the machine's CPU cores (one core held back
+  for UI responsiveness) — never overwrites the original; exported files
+  get a `_myphoto` suffix so an edited photo is never mistaken for its
+  source
 - EXIF preserved where possible
 - Color-managed pipeline (RAW decode → ICC → color space → tone/RGB
   curves → HSL → color balance → film simulation → 3D LUT → grain),
@@ -48,7 +53,7 @@ See [`docs/Architecture.md`](docs/Architecture.md) for details on both.
 ## Project status
 
 **Desktop:** first functional end-to-end version — Image Loader, Color
-Engine, Preset Engine (8 Base Profiles, 9 Film Simulations), Export
+Engine, Preset Engine (8 Base Profiles, 13 Film Simulations), Export
 Engine, Batch Processor, Settings, and the PySide6 GUI are all
 implemented and tested (100+ unit tests, ruff- and strict-mypy-clean),
 and `pyinstaller myphoto.spec` produces a working build.

@@ -78,9 +78,10 @@ throughout the codebase.
    (Sony, Canon, Nikon, Fujifilm, OM System, Panasonic, Leica, iPhone)
    before any creative look is applied.
 2. **Film Simulation** — applies a Fujifilm-inspired look (Provia, Velvia,
-   Astia, Classic Chrome, Classic Neg, Eterna, Acros, Nostalgic Neg, Reala
-   Ace) on top of the normalized image. These are original simulations of
-   a visual style, not decompiled/copied proprietary algorithms.
+   Astia, Classic Chrome, Classic Neg, PRO Neg. Hi, PRO Neg. Std, Eterna,
+   Eterna Bleach Bypass, Acros, Sepia, Nostalgic Neg, Reala Ace) on top of
+   the normalized image. These are original simulations of a visual style,
+   not decompiled/copied proprietary algorithms.
 
 Presets are plain JSON files loaded at runtime from `presets/base_profiles/`
 and `presets/film_simulations/` (and later a user presets directory) —
@@ -111,8 +112,10 @@ schema is documented in `presets/README.md` and
 
 `ExportOptions` never lets the resolved output path equal the source path
 — exporting always requires (and creates) a separate output directory.
-Filenames are built from a `rename_pattern` (`{stem}`, `{name}`, `{index}`)
-via `export_engine.naming.build_output_path`.
+Filenames are the source stem plus a fixed `export_engine.naming.EXPORT_SUFFIX`
+(`_myphoto`) plus the format's extension, via `naming.build_output_path` —
+e.g. `IMG_0001.jpg` exports as `IMG_0001_myphoto.jpg`, so an edited photo is
+never mistaken for its untouched source sitting in the same folder.
 
 ## Workflow
 
@@ -140,12 +143,17 @@ without changing how strongly the rest of the look is applied.
 ## Batch processing
 
 `myphoto.batch.BatchProcessor` runs a `BatchJob` (source images + preset +
-strength + `ExportOptions`) on a `QThreadPool`, one `BatchItemRunnable`
-(load -> `PresetEngine.render` -> `ExportEngine.export`) per image. It
-emits `progress(completed, total)` and `item_finished(BatchItemResult)`
-after each item, and `finished(list[BatchItemResult])` once every item is
-done; `cancel()` makes not-yet-started items short-circuit to a
-`"cancelled"` result. The UI thread never blocks on image processing.
+strength + `ExportOptions`) on a dedicated `QThreadPool` sized to
+`QThread.idealThreadCount() - 1` (minimum 1) — one core deliberately left
+free so the CPU-bound decode/render/encode work on every other core
+doesn't starve the Qt event loop and make the UI stutter — one
+`BatchItemRunnable` (load -> `PresetEngine.render` -> `ExportEngine.export`)
+per image, all queued at once so the pool keeps every worker thread busy
+across the whole batch. It emits `progress(completed, total)` and
+`item_finished(BatchItemResult)` after each item, and
+`finished(list[BatchItemResult])` once every item is done; `cancel()` makes
+not-yet-started items short-circuit to a `"cancelled"` result. The UI
+thread never blocks on image processing.
 
 Each `QRunnable` is created with `setAutoDelete(False)` and kept alive by
 the processor until it finishes — PySide6 can otherwise garbage-collect a
@@ -168,12 +176,18 @@ runnable (and the Qt signal object it owns) mid-emit and crash.
 - `ImageListPanel` (left) — a `QListWidget` accepting drag & drop of
   supported files, emitting `images_dropped`/`selection_changed`.
 - `PreviewPanel` (center) — shows either the rendered or (via a "Show
-  Original" checkbox) the original image, Ctrl+wheel to zoom.
+  Original" checkbox) the original image, fit to the available viewport by
+  default (preserving the photo's own aspect ratio, so portrait photos
+  render tall and landscape photos render wide, instead of a fixed-shape
+  crop), with Ctrl+wheel zooming further in/out from that fitted baseline.
 - `ControlsPanel` (right) — Base Profile / Film Simulation dropdowns
-  (populated from `PresetLoader`), Strength and Film Grain sliders, and
-  the export destination fields (format, quality, output folder, rename
-  pattern).
+  (populated from `PresetLoader`), a Strength slider, a Film Grain
+  checkbox (off by default) + amount slider, and the export destination
+  fields (format, quality, output folder).
 - A bottom bar — progress bar, Cancel, and Export buttons.
+- `myphoto.gui.theme` applies a dark Fusion palette + QSS stylesheet
+  application-wide (accent color, styled group boxes/buttons/sliders/
+  scrollbars) for a more polished look than Qt's default widget style.
 
 `MainWindow` wires these to `EditSession` and debounces preview
 re-renders (150ms `QTimer`) so dragging a slider doesn't trigger a render

@@ -15,17 +15,16 @@ _VALID_FORMATS: tuple[ExportFormat, ...] = get_args(ExportFormat)
 class ExportOptions:
     """How and where :class:`~myphoto.export_engine.writer.ExportEngine` writes a file.
 
-    ``rename_pattern`` is formatted with ``stem`` (source filename without
-    extension), ``name`` (source filename with extension), and ``index``
-    (the image's position in the current batch, 0-based) — e.g.
-    ``"{stem}_myphoto"`` or ``"IMG_{index:04d}"``. The output extension is
-    always derived from ``format`` and appended automatically.
+    The output filename is always the source's stem plus
+    :data:`~myphoto.export_engine.naming.EXPORT_SUFFIX` plus the extension
+    derived from ``format`` — e.g. ``IMG_0001.jpg`` exports as
+    ``IMG_0001_myphoto.jpg`` — so an edited photo is never mistaken for its
+    untouched source sitting in the same folder.
     """
 
     format: ExportFormat
     output_dir: Path
     quality: int = 95
-    rename_pattern: str = "{stem}"
 
     def __post_init__(self) -> None:
         if self.format not in _VALID_FORMATS:

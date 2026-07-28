@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed (Desktop)
+
+- `PreviewPanel` now fits the image to the available viewport by default
+  (preserving its aspect ratio) instead of showing it at native pixel size
+  inside a scroll area. A tall photo only showed its top-left corner —
+  looking like a landscape-cropped slice — until scrolled; it now renders
+  fully, tall-and-narrow for portrait photos and wide-and-short for
+  landscape ones, matching the photo's real orientation. Ctrl+wheel zoom
+  still works, now zooming further in/out from the fitted baseline.
+- Replaced the free-text "Rename Pattern" export field with a fixed
+  `_myphoto` filename suffix (`export_engine.naming.EXPORT_SUFFIX`) — e.g.
+  `IMG_0001.jpg` exports as `IMG_0001_myphoto.jpg` — so every export is
+  automatically and unambiguously marked as edited without the user having
+  to configure a pattern themselves.
+- `BatchProcessor` now runs on a dedicated `QThreadPool` sized to
+  `QThread.idealThreadCount() - 1` (minimum 1) instead of the Qt-wide
+  global thread pool. Batch export is CPU-bound (decode + full color
+  pipeline + encode per image); saturating every logical core left no
+  headroom for the Qt event loop and made the UI visibly stutter during
+  export. Leaving one core free keeps the app responsive while export
+  throughput still scales with the machine's core count.
+- Film Grain is now opt-in: a new "Add Film Grain" checkbox (unchecked by
+  default) gates whether grain is applied at all — previously grain was
+  always applied at whatever the slider was set to (defaulting to 50%),
+  with no way to fully disable it short of dragging the slider to 0 every
+  time. The slider is disabled while the checkbox is off.
+- Applied a dark theme (`myphoto.gui.theme`: Fusion style + custom palette
+  + QSS) application-wide — accent-colored group box titles and controls,
+  styled buttons/sliders/checkboxes/scrollbars/progress bar, and a
+  branded title bar — replacing the previous default Qt widget look.
+
+### Added (Desktop)
+
+- 4 more Fujifilm-inspired film simulations, chosen from the most
+  well-known real Fujifilm modes: PRO Neg. Hi, PRO Neg. Std, Eterna Bleach
+  Bypass, and Sepia (13 total, up from 9). Original color-style
+  approximations, not decompiled proprietary algorithms.
+
 ### Fixed
 
 - Android "Lưu ảnh này" / Export were silently failing on real phone

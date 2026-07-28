@@ -28,16 +28,14 @@ from myphoto.image_loader.exif_utils import EMPTY_EXIF
 class ExportEngine:
     """Renders a processed :class:`ImageBuffer` to a JPEG/PNG/TIFF file."""
 
-    def export(self, buffer: ImageBuffer, options: ExportOptions, index: int = 0) -> Path:
+    def export(self, buffer: ImageBuffer, options: ExportOptions) -> Path:
         """Write ``buffer`` per ``options`` and return the path written to.
 
         Raises:
             ExportError: the resolved output path is the source image, or
                 the underlying encoder fails.
         """
-        output_path = build_output_path(
-            buffer.source_path, options.output_dir, options.rename_pattern, index, options.format
-        )
+        output_path = build_output_path(buffer.source_path, options.output_dir, options.format)
         if output_path.resolve() == Path(buffer.source_path).resolve():
             raise ExportError(output_path, "export path must not overwrite the source image")
 

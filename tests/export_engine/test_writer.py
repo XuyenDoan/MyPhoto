@@ -30,7 +30,7 @@ def test_exports_jpeg_readable_by_pillow(tmp_path: Path) -> None:
 
     output_path = ExportEngine().export(buffer, options)
 
-    assert output_path == tmp_path / "out" / "source.jpg"
+    assert output_path == tmp_path / "out" / "source_myphoto.jpg"
     with Image.open(output_path) as img:
         assert img.mode == "RGB"
         assert img.size == (10, 8)
@@ -57,13 +57,17 @@ def test_exports_8bit_tiff_when_source_is_8bit(tmp_path: Path) -> None:
     assert loaded.dtype == np.uint8
 
 
-def test_refuses_to_overwrite_source_image(tmp_path: Path) -> None:
+def test_refuses_to_overwrite_source_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The "_myphoto" suffix makes a real collision with the source filename
+    # unreachable through normal use; force one to verify the safety check
+    # (defense-in-depth against a future naming change) still fires.
     source = tmp_path / "source.jpg"
     data = np.zeros((4, 4, 3), dtype=np.float32)
     buffer = ImageBuffer(
         data=data, source_path=source, color_space="sRGB", bit_depth=8, is_raw=False
     )
-    options = ExportOptions(format="jpeg", output_dir=tmp_path, rename_pattern="source")
+    options = ExportOptions(format="jpeg", output_dir=tmp_path)
+    monkeypatch.setattr("myphoto.export_engine.writer.build_output_path", lambda *a, **k: source)
 
     with pytest.raises(ExportError, match="overwrite"):
         ExportEngine().export(buffer, options)

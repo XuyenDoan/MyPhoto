@@ -7,6 +7,7 @@ import sys
 from PySide6.QtWidgets import QApplication
 
 from myphoto.gui.main_window import MainWindow
+from myphoto.gui.theme import apply_dark_theme
 from myphoto.preset_engine.loader import PresetLoader
 from myphoto.resources import presets_dir
 from myphoto.settings.store import SettingsStore
@@ -16,6 +17,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("MyPhoto")
     app.setOrganizationName("MyPhoto")
+    apply_dark_theme(app)
 
     presets_root = presets_dir()
     preset_loader = PresetLoader(presets_root / "base_profiles", presets_root / "film_simulations")

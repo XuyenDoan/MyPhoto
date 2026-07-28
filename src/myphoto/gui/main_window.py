@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QProgressBar,
@@ -50,8 +51,13 @@ class MainWindow(QMainWindow):
         self._image_list_panel = ImageListPanel(self)
         self._preview_panel = PreviewPanel(self)
         self._controls_panel = ControlsPanel(self)
+        # The grain checkbox defaults to unchecked; match the session's
+        # initial state so the first preview doesn't apply a preset's grain
+        # before the user has opted in.
+        self._session.grain_amount = self._controls_panel.effective_grain_amount()
 
         self._export_button = QPushButton("Export", self)
+        self._export_button.setObjectName("primaryButton")
         self._cancel_button = QPushButton("Cancel", self)
         self._cancel_button.setEnabled(False)
         self._progress_bar = QProgressBar(self)
@@ -67,6 +73,10 @@ class MainWindow(QMainWindow):
         self._refresh_preset_lists()
 
     def _build_layout(self) -> None:
+        title_label = QLabel('<span style="color:#F2711C;">My</span>Photo', self)
+        title_label.setObjectName("appTitle")
+        title_label.setTextFormat(Qt.TextFormat.RichText)
+
         splitter = QSplitter(self)
         splitter.addWidget(self._image_list_panel)
         splitter.addWidget(self._preview_panel)
@@ -74,6 +84,7 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 4)
         splitter.setStretchFactor(2, 2)
+        splitter.setHandleWidth(2)
 
         bottom_bar = QWidget(self)
         bottom_layout = QHBoxLayout(bottom_bar)
@@ -83,6 +94,9 @@ class MainWindow(QMainWindow):
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(10)
+        layout.addWidget(title_label)
         layout.addWidget(splitter, stretch=1)
         layout.addWidget(bottom_bar)
         self.setCentralWidget(central)
@@ -94,7 +108,7 @@ class MainWindow(QMainWindow):
         self._controls_panel.base_profile_changed.connect(self._on_base_profile_changed)
         self._controls_panel.film_simulation_changed.connect(self._on_film_simulation_changed)
         self._controls_panel.strength_changed.connect(self._on_strength_changed)
-        self._controls_panel.grain_changed.connect(self._on_grain_changed)
+        self._controls_panel.grain_settings_changed.connect(self._on_grain_changed)
 
         self._session.images_changed.connect(self._on_session_images_changed)
         self._session.preview_ready.connect(self._on_preview_ready)

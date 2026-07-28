@@ -51,9 +51,7 @@ class BatchItemRunnable(QRunnable):
                 self._job.strength,
                 grain_amount=self._job.grain_amount,
             )
-            output_path = self._export_engine.export(
-                rendered, self._job.export_options, index=self._index
-            )
+            output_path = self._export_engine.export(rendered, self._job.export_options)
             result = BatchItemResult(source_path, output_path)
         except Exception as exc:  # noqa: BLE001 - any failure becomes a per-item result, not a crash.
             result = BatchItemResult(source_path, None, str(exc))

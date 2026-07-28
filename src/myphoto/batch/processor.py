@@ -5,13 +5,20 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 
-from PySide6.QtCore import QObject, QThreadPool, Signal
+from PySide6.QtCore import QObject, QThread, QThreadPool, Signal
 
 from myphoto.batch.models import BatchItemResult, BatchJob
 from myphoto.batch.worker import BatchItemRunnable
 from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
 from myphoto.preset_engine.engine import PresetEngine
+
+#: One less than the number of logical CPUs (minimum 1): each batch item is
+#: CPU-bound (decode + full color pipeline + encode), so saturating every
+#: core starves the Qt event loop and the UI visibly stutters/lags. Leaving
+#: one core headroom keeps the app responsive while still scaling export
+#: throughput with the machine's core count.
+_EXPORT_THREAD_COUNT = max(1, QThread.idealThreadCount() - 1)
 
 
 class BatchProcessor(QObject):
@@ -38,7 +45,11 @@ class BatchProcessor(QObject):
     ) -> None:
         super().__init__(parent)
         self._preset_engine = preset_engine
-        self._thread_pool = thread_pool if thread_pool is not None else QThreadPool.globalInstance()
+        if thread_pool is not None:
+            self._thread_pool = thread_pool
+        else:
+            self._thread_pool = QThreadPool(self)
+            self._thread_pool.setMaxThreadCount(_EXPORT_THREAD_COUNT)
         self._image_loader = image_loader if image_loader is not None else ImageLoader()
         self._export_engine = export_engine if export_engine is not None else ExportEngine()
         self._cancel_event = threading.Event()

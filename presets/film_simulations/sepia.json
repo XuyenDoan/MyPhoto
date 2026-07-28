@@ -1,0 +1,15 @@
+{
+  "id": "sepia",
+  "name": "Sepia",
+  "kind": "film_simulation",
+  "adjustments": {
+    "tone_curve": [[0.0, 0.0], [0.25, 0.2], [0.75, 0.8], [1.0, 1.0]],
+    "hsl": { "hue_shift_degrees": 0.0, "saturation_scale": 0.0, "lightness_scale": 1.0 },
+    "color_balance": {
+      "shadows": [0.03, 0.0, -0.05],
+      "midtones": [0.05, 0.02, -0.08],
+      "highlights": [0.06, 0.03, -0.06]
+    },
+    "grain": { "amount": 0.1, "size": 1.0 }
+  }
+}

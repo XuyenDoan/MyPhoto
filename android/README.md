@@ -43,6 +43,16 @@ share code with the Python package (different language, different
 runtime); keeping the two pipelines structurally identical is what keeps
 them easy to compare and keep in sync by hand.
 
+## Getting an APK without installing anything locally
+
+`.github/workflows/android-build.yml` builds `:app`'s debug APK on GitHub
+Actions (which has normal internet access, unlike the sandbox this module
+was originally developed in) on every push to `main` that touches
+`android/**`, and can also be triggered manually from the Actions tab
+("Run workflow"). Download the `myphoto-debug-apk` artifact from a
+finished run, transfer it to an Android phone, and install it (enable
+"install unknown apps" for whichever app you use to open the file).
+
 ## Building
 
 ```bash

@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     Plugin/SDK); needs an Android Studio build + device/emulator smoke
     test before shipping. See `android/README.md`.
 
+- `.github/workflows/android-build.yml`: builds `android/app`'s debug APK
+  on GitHub Actions (runs `:core:test` first, then
+  `:app:assembleDebug`) and uploads it as a downloadable artifact —
+  works around this project's sandbox not having access to
+  `dl.google.com`/`maven.google.com`, and lets anyone get an installable
+  APK without setting up Android Studio locally.
+
 ### Fixed
 
 - `ControlsPanel`'s Base Profile / Film Simulation dropdowns now select

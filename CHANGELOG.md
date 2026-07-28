@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `ControlsPanel`'s Base Profile / Film Simulation dropdowns now select
+  the preset `EditSession` actually starts with (`fujifilm`/`provia`)
+  instead of defaulting to index 0 of the alphabetically sorted list
+  (previously showing e.g. "Canon"/"Acros" while rendering with Fujifilm/
+  Provia underneath — found via a manual screenshot walkthrough).
+
 ### Added
 
 - Project scaffolding: `src/myphoto` package layout (gui, workflow,

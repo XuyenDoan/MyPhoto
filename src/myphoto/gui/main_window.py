@@ -115,8 +115,12 @@ class MainWindow(QMainWindow):
             self._controls_panel.set_output_dir(settings.export_folder)
 
     def _refresh_preset_lists(self) -> None:
-        self._controls_panel.set_base_profiles(self._session.list_base_profiles())
-        self._controls_panel.set_film_simulations(self._session.list_film_simulations())
+        self._controls_panel.set_base_profiles(
+            self._session.list_base_profiles(), self._session.base_profile_id
+        )
+        self._controls_panel.set_film_simulations(
+            self._session.list_film_simulations(), self._session.film_simulation_id
+        )
 
     def _on_images_dropped(self, paths: list[Path]) -> None:
         self._session.add_images(paths)

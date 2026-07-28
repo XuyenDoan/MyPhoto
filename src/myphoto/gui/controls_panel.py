@@ -93,19 +93,29 @@ class ControlsPanel(QWidget):
         slider.setValue(default)
         return slider
 
-    def set_base_profiles(self, presets: list[Preset]) -> None:
+    def set_base_profiles(self, presets: list[Preset], selected_id: str | None = None) -> None:
         self._base_profile_combo.blockSignals(True)
         self._base_profile_combo.clear()
         for preset in presets:
             self._base_profile_combo.addItem(preset.name, preset.id)
+        self._select_combo_data(self._base_profile_combo, selected_id)
         self._base_profile_combo.blockSignals(False)
 
-    def set_film_simulations(self, presets: list[Preset]) -> None:
+    def set_film_simulations(self, presets: list[Preset], selected_id: str | None = None) -> None:
         self._film_simulation_combo.blockSignals(True)
         self._film_simulation_combo.clear()
         for preset in presets:
             self._film_simulation_combo.addItem(preset.name, preset.id)
+        self._select_combo_data(self._film_simulation_combo, selected_id)
         self._film_simulation_combo.blockSignals(False)
+
+    @staticmethod
+    def _select_combo_data(combo: QComboBox, data: str | None) -> None:
+        if data is None:
+            return
+        index = combo.findData(data)
+        if index >= 0:
+            combo.setCurrentIndex(index)
 
     def selected_base_profile_id(self) -> str | None:
         data: str | None = self._base_profile_combo.currentData()

@@ -116,9 +116,17 @@ via `export_engine.naming.build_output_path`.
 
 ## Batch processing
 
-`myphoto.batch` runs exports on a `QThreadPool` with one worker per image,
-reporting progress back to the GUI thread via Qt signals, and supporting
-cancellation. The UI thread never blocks on image processing.
+`myphoto.batch.BatchProcessor` runs a `BatchJob` (source images + preset +
+strength + `ExportOptions`) on a `QThreadPool`, one `BatchItemRunnable`
+(load -> `PresetEngine.render` -> `ExportEngine.export`) per image. It
+emits `progress(completed, total)` and `item_finished(BatchItemResult)`
+after each item, and `finished(list[BatchItemResult])` once every item is
+done; `cancel()` makes not-yet-started items short-circuit to a
+`"cancelled"` result. The UI thread never blocks on image processing.
+
+Each `QRunnable` is created with `setAutoDelete(False)` and kept alive by
+the processor until it finishes — PySide6 can otherwise garbage-collect a
+runnable (and the Qt signal object it owns) mid-emit and crash.
 
 ## Quality priorities
 

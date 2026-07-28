@@ -48,4 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `myphoto.image_loader.exif_utils.extract_exif` now returns the raw
   piexif IFD structure (instead of a flattened display dict) so EXIF can
   round-trip correctly through export.
-- 79 unit tests total; ruff and strict mypy clean.
+- `myphoto.settings`: `AppSettings`/`SettingsStore`, persisting last base
+  profile, last film simulation, last folder, export folder, and theme to
+  an INI file via `QSettings`.
+- `myphoto.batch`: `BatchJob`/`BatchItemResult`/`BatchProcessor`, running
+  batch export on a `QThreadPool` with per-item progress and cooperative
+  cancellation, without blocking the UI thread.
+- 87 unit tests total; ruff and strict mypy clean.

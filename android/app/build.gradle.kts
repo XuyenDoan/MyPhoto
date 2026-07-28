@@ -1,7 +1,13 @@
 plugins {
     id("com.android.application") version "8.5.2"
-    id("org.jetbrains.kotlin.android") version "2.0.21"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
+    // No explicit version here: root build.gradle.kts's `kotlin("jvm")
+    // ... apply false` already resolves the Kotlin Gradle Plugin jar
+    // (which bundles the .android and .plugin.compose plugin IDs too)
+    // onto the shared classpath at 2.0.21 — redeclaring a version here
+    // conflicts with that ("already on the classpath with an unknown
+    // version, so compatibility cannot be checked").
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {

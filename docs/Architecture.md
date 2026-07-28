@@ -182,8 +182,54 @@ point (`myphoto` console script); it resolves the bundled `presets/`
 directory via `myphoto.resources.presets_dir()`, which works both from a
 source checkout and from a PyInstaller-frozen build.
 
+## Android
+
+A native Android app was added alongside the Windows desktop app, per the
+decision recorded in
+[`docs/specs/ANDROID_ADDENDUM.md`](specs/ANDROID_ADDENDUM.md): a separate
+Kotlin codebase under `android/`, not an attempt to run the PySide6 app on
+a phone (PySide6/rawpy/OpenCV don't meaningfully target Android).
+
+`android/core` is a pure-Kotlin/JVM module — no Android dependency — that
+mirrors `src/myphoto/color_engine` and `src/myphoto/preset_engine`
+operation-for-operation:
+
+| Desktop (Python)                                | Android (Kotlin)                         |
+|--------------------------------------------------|-------------------------------------------|
+| `core.ImageBuffer`                                | `core.ImageBuffer` (flat `FloatArray`)     |
+| `color_engine.adjustments.ColorAdjustments`       | `core.ColorAdjustments`                    |
+| `color_engine.operations`                         | `core.ColorOperations`                     |
+| `color_engine.pipeline.ColorPipeline`             | `core.ColorPipeline`                       |
+| `preset_engine.serialization`                     | `core.PresetSerialization` (kotlinx.serialization) |
+| `preset_engine.loader.PresetLoader`               | `core.PresetLoader` (via a `PresetSource` interface — `AssetPresetSource` on Android) |
+| `preset_engine.engine.PresetEngine`               | `core.PresetEngine`                        |
+
+Both sides read the **same JSON files** from the repo-root `presets/` —
+Android's `:app` module copies them into `assets/presets/` at build time
+(see the `copyPresets` Gradle task in `android/app/build.gradle.kts`), so
+there is exactly one source of truth for preset parameters across
+platforms, per the "Preset lưu dạng JSON, không hardcode" rule.
+
+`android/app` is the Jetpack Compose application: Android's system Photo
+Picker for import (JPEG/PNG/HEIC — no RAW, see the addendum), a
+`MyPhotoViewModel` that plays the same role as desktop's `EditSession`
+(image list, current preset/strength/grain, debounced preview render,
+batch export), and `MediaStoreExporter`, which writes exports into a
+`Pictures/MyPhoto` gallery album — every export is a new MediaStore item,
+so (like the desktop Export Engine) the original is never overwritten.
+
+See [`android/README.md`](../android/README.md) for build instructions,
+the full scope-difference list, and a build-verification note: `:core`
+was built and unit-tested in this project's development environment (44
+JUnit tests), but `:app` requires the Android Gradle Plugin and Android
+SDK (served from `dl.google.com`/`maven.google.com`), which that
+environment's network policy blocked — `:app` should be treated as
+written-but-unverified until it's opened in Android Studio and smoke
+tested on a device or emulator.
+
 ## Non-goals
 
 Crop, layers, brush tools, healing, object removal, AI portrait editing —
 see the spec's "KHÔNG BAO GỒM" section. Any feature request outside color/
-film simulation, preview, and export is out of scope by design.
+film simulation, preview, and export is out of scope by design (this
+applies equally to the Android app).

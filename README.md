@@ -1,14 +1,14 @@
 # MyPhoto
 
-A small, fast, and stable Windows desktop app that does exactly one thing
-well: apply high-quality, Fujifilm-inspired film simulation color looks to
-your photos.
+A small, fast, and stable app — Windows desktop and Android — that does
+exactly one thing well: apply high-quality, Fujifilm-inspired film
+simulation color looks to your photos.
 
 MyPhoto is **not** a Lightroom or Photoshop replacement. There is no crop,
 no layers, no brushes, no healing, no object removal, no AI portrait tools.
 Just:
 
-**Drag photos in → pick a Fujifilm-style color → export.**
+**Pick photos in → pick a Fujifilm-style color → export.**
 
 ## Features
 
@@ -26,28 +26,46 @@ Just:
   16-bit/32-bit-float where supported
 
 See [`docs/specs/MYPHOTO_CLAUDE_PROMPT.md`](docs/specs/MYPHOTO_CLAUDE_PROMPT.md)
-for the full product specification driving this project, and
-[`docs/Architecture.md`](docs/Architecture.md) for the technical design.
+for the full product specification driving this project,
+[`docs/specs/ANDROID_ADDENDUM.md`](docs/specs/ANDROID_ADDENDUM.md) for the
+Android-specific scope, and [`docs/Architecture.md`](docs/Architecture.md)
+for the technical design of both platforms.
 
 ## Tech stack
 
-Python 3.13+, PySide6, NumPy, Pillow, OpenCV (basic ops only), rawpy/LibRaw,
-OpenColorIO, LittleCMS, OpenImageIO (where appropriate), 3D LUT / Hald CLUT,
-piexif. Third-party color libraries are wrapped behind an Adapter Pattern —
-MyPhoto only implements the Preset Engine, Workflow, Batch Processor, and UI
-itself. See [`docs/Architecture.md`](docs/Architecture.md).
+**Desktop:** Python 3.13+, PySide6, NumPy, Pillow, OpenCV (basic ops
+only), rawpy/LibRaw, OpenColorIO, LittleCMS, OpenImageIO (where
+appropriate), 3D LUT / Hald CLUT, piexif. Third-party color libraries are
+wrapped behind an Adapter Pattern — MyPhoto only implements the Preset
+Engine, Workflow, Batch Processor, and UI itself.
+
+**Android:** Kotlin + Jetpack Compose, a pure-Kotlin `core` module
+mirroring the desktop Color/Preset Engines, MediaStore for export, the
+system Photo Picker for import (JPEG/PNG only — no RAW on this platform).
+
+See [`docs/Architecture.md`](docs/Architecture.md) for details on both.
 
 ## Project status
 
-First functional end-to-end version: Image Loader, Color Engine, Preset
-Engine (8 Base Profiles, 9 Film Simulations), Export Engine, Batch
-Processor, Settings, and the PySide6 GUI are all implemented and tested
-(100+ unit tests, ruff- and strict-mypy-clean), and `pyinstaller
-myphoto.spec` produces a working build. See [`CHANGELOG.md`](CHANGELOG.md)
-for details and known limitations (e.g. ICC/EXIF embedding on 16-bit
-PNG/TIFF export).
+**Desktop:** first functional end-to-end version — Image Loader, Color
+Engine, Preset Engine (8 Base Profiles, 9 Film Simulations), Export
+Engine, Batch Processor, Settings, and the PySide6 GUI are all
+implemented and tested (100+ unit tests, ruff- and strict-mypy-clean),
+and `pyinstaller myphoto.spec` produces a working build.
+
+**Android:** `android/core` (the color/preset engine port) is implemented
+and unit-tested (44 JUnit tests, pure Kotlin/JVM). `android/app` (the
+Compose UI, MediaStore export, Photo Picker import) is implemented but
+**not yet build-verified** — it needs to be opened in Android Studio and
+smoke-tested on a device/emulator; see
+[`android/README.md`](android/README.md) for why and what to check.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for full details and known limitations
+(e.g. ICC/EXIF embedding on 16-bit PNG/TIFF export on desktop).
 
 ## Getting started (development)
+
+### Desktop
 
 ```bash
 python -m venv .venv
@@ -58,6 +76,16 @@ python -m myphoto.app          # run the app
 ```
 
 See [`docs/DeveloperGuide.md`](docs/DeveloperGuide.md) for details.
+
+### Android
+
+```bash
+cd android
+./gradlew :core:test           # pure Kotlin/JVM, no Android SDK required
+```
+
+Open `android/` in Android Studio to build/run `:app`. See
+[`android/README.md`](android/README.md).
 
 ## Contributing
 

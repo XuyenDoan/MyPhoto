@@ -36,3 +36,12 @@ Thumbs.db
 # Local settings / user data
 *.log
 settings.local.json
+
+# Android / Gradle
+.gradle/
+local.properties
+*.iml
+captures/
+.cxx/
+# Copied from repo-root presets/ by the :app copyPresets Gradle task.
+android/app/src/main/assets/presets/

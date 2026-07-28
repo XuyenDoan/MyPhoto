@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Android app** (`android/`), a native Kotlin/Jetpack Compose companion
+  to the desktop app — see `docs/specs/ANDROID_ADDENDUM.md` for the scope
+  decision and `docs/Architecture.md`'s Android section for the design.
+  - `android/core`: pure Kotlin/JVM port of the Color Engine and Preset
+    Engine (`ImageBuffer`, `ColorAdjustments`, `ColorOperations`,
+    `ColorPipeline`, preset JSON (de)serialization via
+    kotlinx.serialization, `PresetLoader`, `PresetEngine`) — no Android
+    dependency, so it builds/tests with a plain JDK + Gradle. Reads the
+    exact same `presets/` JSON files as the desktop app. 44 JUnit 5 tests,
+    including one that loads and validates every preset shipped in
+    `presets/`. Built and unit-tested successfully.
+  - `android/app`: Jetpack Compose UI, system Photo Picker import
+    (JPEG/PNG only — no RAW on Android), `MyPhotoViewModel` (mirrors
+    desktop's `EditSession`: image list, current preset/strength/grain,
+    debounced preview, batch export), `MediaStoreExporter` (exports to a
+    `Pictures/MyPhoto` gallery album, never touching the original),
+    DataStore-backed settings for last-used presets. **Written but not
+    build-verified** — the development environment's network policy
+    blocks `dl.google.com`/`maven.google.com` (Android Gradle
+    Plugin/SDK); needs an Android Studio build + device/emulator smoke
+    test before shipping. See `android/README.md`.
+
 ### Fixed
 
 - `ControlsPanel`'s Base Profile / Film Simulation dropdowns now select

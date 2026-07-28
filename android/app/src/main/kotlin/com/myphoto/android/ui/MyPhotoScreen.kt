@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -215,7 +216,7 @@ private fun PresetDropdown(
                 .fillMaxWidth()
                 .menuAnchor(),
         )
-        ExposedDropdownMenuDefaults.DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             presets.forEach { preset ->
                 DropdownMenuItem(
                     text = { Text(preset.name) },

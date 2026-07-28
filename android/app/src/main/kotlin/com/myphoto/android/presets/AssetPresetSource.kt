@@ -4,10 +4,11 @@ import android.content.res.AssetManager
 import com.myphoto.core.PresetSource
 
 /**
- * Reads preset JSON from `assets/presets/{base_profiles,film_simulations}/*.json`,
- * which is copied from the repo-root `presets/` directory at build time
- * (see the `copyPresets` Gradle task in `app/build.gradle.kts`) — that
- * directory is the single source of truth, shared with the desktop app.
+ * Reads preset JSON files from `assets/presets/base_profiles/` and
+ * `assets/presets/film_simulations/`, which is copied from the repo-root
+ * `presets/` directory at build time (see the `copyPresets` Gradle task
+ * in `app/build.gradle.kts`) — that directory is the single source of
+ * truth, shared with the desktop app.
  */
 class AssetPresetSource(private val assets: AssetManager) : PresetSource {
 

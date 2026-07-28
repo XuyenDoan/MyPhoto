@@ -11,6 +11,7 @@ import java.util.Random
 object ColorOperations {
 
     fun applyWhiteBalance(buffer: ImageBuffer, temp: Float, tint: Float): ImageBuffer {
+        if (temp == 0f && tint == 0f) return buffer
         val rGain = 1f + 0.35f * temp + 0.15f * tint
         val gGain = 1f - 0.25f * tint
         val bGain = 1f - 0.35f * temp + 0.15f * tint
@@ -18,6 +19,7 @@ object ColorOperations {
     }
 
     fun applyExposure(buffer: ImageBuffer, exposureEv: Float): ImageBuffer {
+        if (exposureEv == 0f) return buffer
         val gain = Math.pow(2.0, exposureEv.toDouble()).toFloat()
         return mapRgb(buffer) { r, g, b -> Triple(r * gain, g * gain, b * gain) }
     }
@@ -41,13 +43,17 @@ object ColorOperations {
         return last.second
     }
 
-    fun applyToneCurve(buffer: ImageBuffer, curve: Curve): ImageBuffer =
-        mapRgb(buffer) { r, g, b ->
+    fun applyToneCurve(buffer: ImageBuffer, curve: Curve): ImageBuffer {
+        if (curve == IDENTITY_CURVE) return buffer
+        return mapRgb(buffer) { r, g, b ->
             Triple(applyCurve(r, curve), applyCurve(g, curve), applyCurve(b, curve))
         }
+    }
 
-    fun applyRgbCurves(buffer: ImageBuffer, red: Curve, green: Curve, blue: Curve): ImageBuffer =
-        mapRgb(buffer) { r, g, b -> Triple(applyCurve(r, red), applyCurve(g, green), applyCurve(b, blue)) }
+    fun applyRgbCurves(buffer: ImageBuffer, red: Curve, green: Curve, blue: Curve): ImageBuffer {
+        if (red == IDENTITY_CURVE && green == IDENTITY_CURVE && blue == IDENTITY_CURVE) return buffer
+        return mapRgb(buffer) { r, g, b -> Triple(applyCurve(r, red), applyCurve(g, green), applyCurve(b, blue)) }
+    }
 
     fun applyHsl(
         buffer: ImageBuffer,

@@ -197,30 +197,12 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
             if (images.isEmpty()) return@launch
 
             _uiState.update { it.copy(isExporting = true, exportProgress = 0 to images.size) }
-            val application = getApplication<Application>()
             var succeeded = 0
 
             for ((index, uri) in images.withIndex()) {
                 if (!isActive) break
-                try {
-                    withContext(Dispatchers.Default) {
-                        val bitmap = BitmapConversions.decodeBitmap(application.contentResolver, uri, maxDimension = null)
-                        val buffer = BitmapConversions.bitmapToImageBuffer(bitmap)
-                        bitmap.recycle() // free the full-resolution source before rendering allocates more
-                        val rendered = presetEngine.render(
-                            buffer, state.baseProfileId, state.filmSimulationId, state.strength, state.grainAmount
-                        )
-                        val renderedBitmap = BitmapConversions.imageBufferToBitmap(rendered)
-                        val name = "myphoto_${System.currentTimeMillis()}_$index"
-                        MediaStoreExporter.export(application, renderedBitmap, name, options)
-                        renderedBitmap.recycle()
-                    }
+                if (renderAndSave(uri, state, options, "myphoto_${System.currentTimeMillis()}_$index")) {
                     succeeded++
-                } catch (ce: CancellationException) {
-                    throw ce
-                } catch (t: Throwable) {
-                    // A single failed item (including an OutOfMemoryError on a huge
-                    // photo) doesn't abort the batch — mirrors the desktop BatchProcessor.
                 }
                 _uiState.update { it.copy(exportProgress = (index + 1) to images.size) }
             }
@@ -242,8 +224,66 @@ class MyPhotoViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Renders the currently selected photo at full resolution and saves just that one. */
+    fun saveCurrentPreview(options: ExportOptions) {
+        val state = _uiState.value
+        val index = state.selectedIndex
+        val uri = index?.let { state.images.getOrNull(it) }
+        if (uri == null) {
+            _uiState.update { it.copy(statusMessage = "Chưa chọn ảnh nào") }
+            return
+        }
+
+        exportJob?.cancel()
+        exportJob = viewModelScope.launch {
+            _uiState.update { it.copy(isExporting = true) }
+            val succeeded = renderAndSave(uri, state, options, "myphoto_${System.currentTimeMillis()}")
+            _uiState.update {
+                it.copy(
+                    isExporting = false,
+                    statusMessage = if (succeeded) "Đã lưu ảnh vào thư viện" else "Lưu ảnh thất bại",
+                )
+            }
+        }
+    }
+
+    /** Decodes [uri] at full resolution, renders it with [state]'s current preset, and saves it. */
+    private suspend fun renderAndSave(
+        uri: Uri,
+        state: UiState,
+        options: ExportOptions,
+        displayName: String,
+    ): Boolean {
+        val application = getApplication<Application>()
+        return try {
+            withContext(Dispatchers.Default) {
+                val bitmap = BitmapConversions.decodeBitmap(application.contentResolver, uri, maxDimension = null)
+                val buffer = BitmapConversions.bitmapToImageBuffer(bitmap)
+                bitmap.recycle() // free the full-resolution source before rendering allocates more
+                val rendered = presetEngine.render(
+                    buffer, state.baseProfileId, state.filmSimulationId, state.strength, state.grainAmount
+                )
+                val renderedBitmap = BitmapConversions.imageBufferToBitmap(rendered)
+                MediaStoreExporter.export(application, renderedBitmap, displayName, options)
+                renderedBitmap.recycle()
+            }
+            true
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            // A failed item (including an OutOfMemoryError on a huge photo)
+            // doesn't crash the app — mirrors the desktop BatchProcessor.
+            false
+        }
+    }
+
     private companion object {
-        const val PREVIEW_MAX_DIMENSION = 1600
+        // Smaller than a typical phone screen's width, deliberately: keeps
+        // each preview render's transient memory use low (this pipeline
+        // allocates a fresh buffer per color stage) so repeated fast preset/
+        // photo switching doesn't run the app out of heap. Export always
+        // re-decodes and renders at full resolution regardless of this.
+        const val PREVIEW_MAX_DIMENSION = 1024
         const val PREVIEW_DEBOUNCE_MS = 150L
     }
 }

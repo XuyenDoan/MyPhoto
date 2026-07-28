@@ -25,8 +25,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   crashing. Also recycle intermediate/discarded bitmaps (a stale
   preview's result, and the source/rendered bitmaps used mid-export)
   to reduce peak memory rather than waiting on GC.
+- Android `OutOfMemoryError` during preview (the fix above stopped it
+  from crashing the app, but it was still failing to render): the color
+  pipeline (`ColorOperations` in `android/core`) allocated a fresh
+  full-size buffer for every stage — white balance, exposure, tone curve,
+  RGB curves — even when that stage's parameters were a no-op, so a
+  single preview could burst-allocate several times the image's size in
+  short-lived buffers. Those four operations now short-circuit to the
+  input buffer when their parameters are neutral, matching the pattern
+  already used for HSL/color-balance/grain. Also lowered the Android
+  preview's downsample cap from 1600px to 1024px (export still renders
+  at full resolution) and added `android:largeHeap="true"` — together,
+  meaningfully less peak memory per preview render on constrained devices.
 
 ### Added
+
+- Android: a "Lưu ảnh này" (Save this photo) button next to the preview,
+  so a single currently-viewed photo can be saved with its preset applied
+  without having to use the multi-photo batch Export section below it.
+  Reuses the same full-resolution render/save path as batch export.
 
 - **Android app** (`android/`), a native Kotlin/Jetpack Compose companion
   to the desktop app — see `docs/specs/ANDROID_ADDENDUM.md` for the scope

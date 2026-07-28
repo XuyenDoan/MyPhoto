@@ -59,6 +59,7 @@ fun MyPhotoScreen(
     onShowOriginalChanged: (Boolean) -> Unit,
     onExportClicked: (ExportOptions) -> Unit,
     onCancelExport: () -> Unit,
+    onSaveCurrentPhoto: (ExportOptions) -> Unit,
     onStatusMessageShown: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -106,6 +107,16 @@ fun MyPhotoScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = state.showOriginal, onCheckedChange = onShowOriginalChanged)
                 Text("Xem ảnh gốc (Before)")
+            }
+
+            Button(
+                onClick = {
+                    onSaveCurrentPhoto(ExportOptions(format = exportFormat, quality = quality.toInt()))
+                },
+                enabled = state.selectedIndex != null && !state.isExporting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Lưu ảnh này (đã áp dụng preset)")
             }
 
             PresetDropdown(

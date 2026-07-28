@@ -41,6 +41,7 @@ class MainActivity : ComponentActivity() {
                     onShowOriginalChanged = viewModel::setShowOriginal,
                     onExportClicked = { options: ExportOptions -> viewModel.exportAll(options) },
                     onCancelExport = viewModel::cancelExport,
+                    onSaveCurrentPhoto = { options: ExportOptions -> viewModel.saveCurrentPreview(options) },
                     onStatusMessageShown = viewModel::consumeStatusMessage,
                 )
             }

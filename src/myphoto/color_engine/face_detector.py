@@ -62,8 +62,12 @@ def _run(buffer: ImageBuffer) -> tuple[np.ndarray, np.ndarray]:
     boxes ``(N, 4)`` as ``(x0, y0, x1, y1)`` fractions of the image.
     """
     session = _get_session()
-    rgb = np.clip(buffer.data[..., :3], 0.0, 1.0).astype(np.float32) * 255.0
-    resized = cv2.resize(rgb, _INPUT_SIZE, interpolation=cv2.INTER_LINEAR)
+    # Resize to the model's fixed input size *before* the clip/scale copy —
+    # doing it in the other order (as an earlier version did) allocates a
+    # full-resolution float32 copy of the source photo just to immediately
+    # shrink it to 320x240, wasteful on a high-megapixel photo.
+    resized = cv2.resize(buffer.data[..., :3], _INPUT_SIZE, interpolation=cv2.INTER_LINEAR)
+    resized = np.clip(resized, 0.0, 1.0).astype(np.float32) * 255.0
     normalized = (resized - _MEAN) / _STD
     input_tensor = np.transpose(normalized, (2, 0, 1))[np.newaxis, ...].astype(np.float32)
 

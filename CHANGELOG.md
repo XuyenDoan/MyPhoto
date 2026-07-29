@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (Desktop) — batch export could over-subscribe threads/RAM on multi-core machines
+
+- Full-source review requested after the previous export performance
+  pass, specifically to bound thread/RAM usage so a batch export can't
+  make the whole machine feel sluggish or starve other running apps.
+  - `BatchProcessor`'s thread pool previously scaled with
+    `QThread.idealThreadCount() - 1` — on an 8, 16, or 32-core machine
+    that's many images decoding/processing concurrently at once, each
+    needing several hundred MB even after the LUT-tiling and
+    blur-downsampling memory fixes. Capped at a fixed `_MAX_EXPORT_THREADS`
+    (4) regardless of core count. Measured directly: simulating a 12-core
+    machine (11 threads, the old formula's result, vs. the new cap of 4)
+    on an 8-image, ~6MP-each batch — peak RSS dropped from 5040MB to
+    2441MB (roughly half) with **no** measurable time cost (18.4s vs.
+    18.5s): real hardware parallelism is limited well before a high
+    core-count formula assumes, so the old scaling bought no actual
+    throughput on typical machines, just higher peak resource use.
+  - `color_engine.face_detector._run()` (used by Auto-suggest, Suggest
+    Composition Crop, and the portrait white-balance fix) allocated a
+    full-resolution clipped/scaled copy of the source photo before
+    resizing it down to the model's fixed 320x240 input — resizing first,
+    then only clipping/scaling the small result, avoids that wasted
+    full-resolution allocation on a high-megapixel photo.
+  - Reviewed the rest of `color_engine`/`preset_engine`/`image_loader` for
+    similar patterns: `ColorPipeline.process()` already rebinds a single
+    `rgb` variable stage-to-stage (each stage's output immediately
+    dereferences the previous one, so old arrays free as soon as the next
+    stage's array exists, rather than accumulating); `image_loader`'s
+    decode path has no redundant full-resolution copies beyond what
+    decoding requires. No further changes needed there.
+
 ### Verified (Desktop) — no unwanted color cast across presets on portraits/landscapes
 
 - Re-checked color rendering across all 13 Film Simulations, on both a

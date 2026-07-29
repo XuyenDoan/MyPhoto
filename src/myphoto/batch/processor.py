@@ -13,12 +13,20 @@ from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
 from myphoto.preset_engine.engine import PresetEngine
 
-#: One less than the number of logical CPUs (minimum 1): each batch item is
-#: CPU-bound (decode + full color pipeline + encode), so saturating every
-#: core starves the Qt event loop and the UI visibly stutters/lags. Leaving
-#: one core headroom keeps the app responsive while still scaling export
-#: throughput with the machine's core count.
-_EXPORT_THREAD_COUNT = max(1, QThread.idealThreadCount() - 1)
+#: Each concurrently-processing image can transiently need several hundred
+#: megabytes (source decode + every correction stage's own working copy),
+#: even after the memory optimizations in color_engine (tiled 3D LUT,
+#: downsampled local-adjust blurs) bounded the single biggest spike. Simply
+#: using every available core minus one (the previous approach) scales
+#: peak RAM and CPU load linearly with core count — on an 8, 16, or
+#: 32-core machine that's easily several gigabytes of simultaneous
+#: allocation and every core pegged, which is what actually produces a
+#: sluggish/frozen-feeling machine and starves other running apps, not
+#: just this one falling behind. Capping at a fixed small number keeps
+#: batch export meaningfully parallel while bounding worst-case resource
+#: use regardless of how many cores the machine has.
+_MAX_EXPORT_THREADS = 4
+_EXPORT_THREAD_COUNT = max(1, min(QThread.idealThreadCount() - 1, _MAX_EXPORT_THREADS))
 
 
 class BatchProcessor(QObject):

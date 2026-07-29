@@ -7,7 +7,7 @@ from PIL import Image
 from PySide6.QtCore import QThreadPool
 
 from myphoto.batch.models import BatchJob
-from myphoto.batch.processor import BatchProcessor
+from myphoto.batch.processor import _MAX_EXPORT_THREADS, BatchProcessor
 from myphoto.export_engine.models import ExportOptions
 from myphoto.preset_engine.engine import PresetEngine
 from myphoto.preset_engine.loader import PresetLoader
@@ -26,6 +26,17 @@ def preset_engine() -> PresetEngine:
 def _make_image(path: Path) -> None:
     array = (np.random.default_rng(0).random((6, 6, 3)) * 255).astype(np.uint8)
     Image.fromarray(array).save(path)
+
+
+def test_default_thread_pool_is_capped_regardless_of_core_count(
+    preset_engine: PresetEngine,
+) -> None:
+    # Bounds worst-case concurrent memory/CPU use on high-core-count
+    # machines instead of scaling the thread pool with every available
+    # core (see BatchProcessor's docstring/module comment for the
+    # measured RAM-vs-throughput tradeoff this cap is based on).
+    processor = BatchProcessor(preset_engine)
+    assert processor._thread_pool.maxThreadCount() <= _MAX_EXPORT_THREADS
 
 
 def test_processes_all_items_and_reports_progress(

@@ -64,6 +64,91 @@ def test_oversaturated_region_gets_desaturated() -> None:
     assert chroma(result[:, :32]) < chroma(rgb[:, :32])
 
 
+def test_white_balance_exclude_mask_ignores_masked_pixels_in_the_estimate() -> None:
+    # A warm patch (skin-like) covering most of the frame, with a small
+    # neutral-gray corner. If the warm patch is excluded from the
+    # gray-world estimate, the correction should be driven by the neutral
+    # corner instead and barely touch anything (there's no real cast to
+    # fix once the warm region is excluded).
+    size = 64
+    rgb = np.full((size, size, 3), (0.85, 0.65, 0.5), dtype=np.float32)  # warm "skin"
+    rgb[:16, :16] = 0.5  # small neutral-gray corner
+
+    exclude_mask = np.ones((size, size), dtype=bool)
+    exclude_mask[:16, :16] = False  # only the neutral corner feeds the estimate
+
+    result = apply_local_balance(rgb, strength=1.0, white_balance_exclude_mask=exclude_mask)
+
+    # The warm region (excluded from the estimate) should keep most of its
+    # original warmth, unlike gray-world-on-the-whole-frame which would
+    # cool it toward neutral.
+    warm_region_after = result[32:, 32:]
+    gap_before = float(rgb[32:, 32:, 0].mean() - rgb[32:, 32:, 2].mean())
+    gap_after = float(warm_region_after[..., 0].mean() - warm_region_after[..., 2].mean())
+    assert gap_after > gap_before * 0.7
+
+
+def _synth_portrait_warm_face_neutral_bg(size: int, face_scale: float = 2.5) -> np.ndarray:
+    """A neutral-gray backdrop with a large, genuinely warm-toned,
+    detectable synthetic face (eyes/nose/mouth) filling most of the frame
+    — the classic tight portrait crop where gray-world's failure mode
+    (reading the face's own warmth as an unwanted cast) bites hardest.
+    """
+    import cv2
+
+    img = np.full((size, size, 3), (128, 128, 128), dtype=np.uint8)
+    cx, cy = size // 2, size // 2
+    fw, fh = int(size // 8 * face_scale), int(size // 6 * face_scale)
+    # cv2 draw colors given in BGR; cvtColor below flips to RGB, so these
+    # produce genuinely warm (R > G > B) results, unlike some other
+    # synthetic-face helpers in this test suite that specify BGR tuples
+    # which come out cool-toned after conversion.
+    cv2.ellipse(img, (cx, cy), (fw, fh), 0, 0, 360, (150, 180, 225), -1)
+    for ex in (cx - fw // 2, cx + fw // 2):
+        ey = cy - fh // 3
+        cv2.ellipse(img, (ex, ey), (max(4, fw // 5), max(3, fh // 8)), 0, 0, 360, (255, 255, 255), -1)
+        cv2.circle(img, (ex, ey), max(2, fw // 12), (40, 60, 90), -1)
+        cv2.circle(img, (ex, ey), max(1, fw // 25), (10, 10, 10), -1)
+    cv2.ellipse(img, (cx, cy + fh // 2), (max(6, fw // 3), max(2, fh // 10)), 0, 0, 180, (70, 80, 150), -1)
+    result: np.ndarray = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+    return result
+
+
+def test_portrait_white_balance_keeps_more_of_the_skin_tone_with_face_detection() -> None:
+    # Regression test for a real reported bug: a portrait where the face
+    # fills much of the frame got gray-world white-balanced as if the
+    # skin's own warmth were a color cast, visibly cooling/blue-tinting
+    # the face. apply_local_balance_to_buffer() detects the face and
+    # excludes it from the estimate; verify it preserves noticeably more
+    # warmth than the same correction with no exclusion.
+    rgb = _synth_portrait_warm_face_neutral_bg(size=480)
+    buffer = ImageBuffer(
+        data=rgb, source_path=Path("/tmp/portrait.png"), color_space="sRGB", bit_depth=8, is_raw=False
+    )
+
+    from myphoto.color_engine.face_detector import detect_primary_face
+
+    face = detect_primary_face(buffer)
+    assert face is not None  # sanity: this synthetic face must actually be detectable
+
+    height, width = rgb.shape[:2]
+    face_mask = np.zeros((height, width), dtype=bool)
+    face_mask[
+        int(face.y0 * height) : int(face.y1 * height), int(face.x0 * width) : int(face.x1 * width)
+    ] = True
+
+    def warmth_gap(region: np.ndarray) -> float:
+        return float(region[..., 0].mean() - region[..., 2].mean())
+
+    without_face_detection = apply_local_balance(rgb, strength=1.0, white_balance_exclude_mask=None)
+    with_face_detection = apply_local_balance_to_buffer(buffer)
+
+    gap_without = warmth_gap(without_face_detection[face_mask])
+    gap_with = warmth_gap(with_face_detection.data[..., :3][face_mask])
+
+    assert gap_with > gap_without
+
+
 def test_warm_color_cast_is_neutralized() -> None:
     # A uniform warm (orange-ish) cast across the whole photo, as if lit by
     # incandescent bulbs — gray-world should pull the channel means together.

@@ -206,6 +206,11 @@ QSlider::handle:horizontal:disabled {{
     background: {_TEXT_MUTED};
 }}
 
+QCheckBox {{
+    padding: 3px 0px;
+    spacing: 8px;
+}}
+
 QCheckBox::indicator {{
     width: 16px;
     height: 16px;

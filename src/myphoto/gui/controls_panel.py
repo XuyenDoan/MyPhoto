@@ -50,7 +50,9 @@ class ControlsPanel(QWidget):
         # Simulation (on the source photo) and again, more gently, after it
         # (as a safety net against clipping the preset's own tone curve/LUT
         # can reintroduce) — see color_engine.local_adjust. Deterministic
-        # image processing, not a trained model.
+        # image processing; the white-balance step also uses the same small
+        # local face-detection model as Auto-suggest, only to keep skin
+        # tone from being misread as a color cast.
         self._local_balance_checkbox = QCheckBox("Tự Động Cân Bằng Sáng && Màu (beta)", self)
         self._local_balance_checkbox.setChecked(False)
         self._local_balance_checkbox.setToolTip(
@@ -60,7 +62,9 @@ class ControlsPanel(QWidget):
             "toàn bộ ảnh. Chạy trước khi áp preset màu (trên ảnh gốc), và "
             "chạy nhẹ thêm một lần nữa sau khi áp preset để khắc phục hiện "
             "tượng cháy sáng/cháy màu mà chính preset có thể gây ra. Xử lý "
-            "ảnh theo thuật toán, không dùng AI."
+            "ảnh theo thuật toán; riêng bước cân bằng trắng có nhận diện "
+            "khuôn mặt (offline, cục bộ) để không hiểu nhầm màu da là ám "
+            "màu cần chỉnh."
         )
         self._local_balance_checkbox.toggled.connect(self.local_balance_toggled.emit)
 
@@ -112,6 +116,7 @@ class ControlsPanel(QWidget):
 
         correction_group = QGroupBox("Hiệu Chỉnh Thông Minh", self)
         correction_form = QFormLayout(correction_group)
+        correction_form.setVerticalSpacing(10)
         correction_form.addRow(self._local_balance_checkbox)
         correction_form.addRow(self._auto_level_checkbox)
         correction_form.addRow(self._chromatic_aberration_checkbox)
@@ -137,6 +142,7 @@ class ControlsPanel(QWidget):
 
         composition_group = QGroupBox("Bố Cục (chỉ gợi ý)", self)
         composition_form = QFormLayout(composition_group)
+        composition_form.setVerticalSpacing(10)
         composition_form.addRow(self._composition_suggest_checkbox)
 
         self._base_profile_combo = QComboBox(self)
@@ -176,6 +182,7 @@ class ControlsPanel(QWidget):
 
         preset_group = QGroupBox("Mô Phỏng Phim", self)
         preset_form = QFormLayout(preset_group)
+        preset_form.setVerticalSpacing(10)
         preset_form.addRow("Máy ảnh gốc", self._base_profile_combo)
         preset_form.addRow("Mô phỏng phim", self._film_simulation_combo)
         preset_form.addRow(self._auto_suggest_checkbox)
@@ -203,6 +210,7 @@ class ControlsPanel(QWidget):
 
         export_group = QGroupBox("Xuất Ảnh", self)
         export_form = QFormLayout(export_group)
+        export_form.setVerticalSpacing(10)
         export_form.addRow("Định dạng", self._format_combo)
         export_form.addRow("Chất lượng", self._quality_spin)
         export_form.addRow("Thư mục xuất", self._output_dir_edit)
@@ -210,6 +218,7 @@ class ControlsPanel(QWidget):
         export_form.addRow(naming_note)
 
         layout = QVBoxLayout(self)
+        layout.setSpacing(14)
         layout.addWidget(correction_group)
         layout.addWidget(composition_group)
         layout.addWidget(preset_group)

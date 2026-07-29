@@ -20,6 +20,18 @@ treated as a color cast (warm indoor lighting, a cool shade cast, ...) and
 scaled back out. This is global (one gain per channel for the whole
 photo), unlike the exposure/saturation steps below — a color cast is
 normally a property of the light source, not of one region of the frame.
+Gray-world's classic failure mode is a photo dominated by one legitimately
+strong memory color — most commonly a portrait where skin fills most of
+the frame, which reads as "a warm cast" and gets cooled toward gray,
+visibly draining/blue-tinting real skin tones (found via testing:
+verified this had actually happened). `apply_local_balance_to_buffer()`
+detects a face (the same ONNX model Auto-suggest Film Simulation and
+Suggest Composition Crop already use) and excludes it from the gray-world
+*estimate* — the correction still applies to the whole photo, including
+the face, just isn't skewed by treating the face's own warmth as the
+thing needing correcting. This is the one place in this module that isn't
+purely classical/deterministic image processing, though it's still fully
+local/offline — see `_auto_white_balance()`'s `exclude_mask` parameter.
 
 Unlike the rest of the Color Pipeline — one global exposure/tone-curve/HSL
 adjustment applied uniformly to the whole image — the exposure/saturation
@@ -58,8 +70,10 @@ One-directional deliberately: a region that's genuinely gray/neutral (a
 wall, an overcast sky) isn't "under-saturated" in need of rescue — forcing
 color into it would introduce a false tint, not fix anything.
 
-This is a from-scratch, deterministic image-processing technique — not a
-trained model, no network call, no cost.
+This is, aside from the face-exclusion step noted above, a from-scratch,
+deterministic image-processing technique — no network call, no cost, and
+fully local/offline even where it does use a (small, bundled) trained
+model.
 """
 
 from __future__ import annotations
@@ -165,9 +179,24 @@ def _large_blur(single_channel: np.ndarray, sigma: float) -> np.ndarray:
     return upsampled
 
 
-def _auto_white_balance(rgb: np.ndarray, strength: float) -> np.ndarray:
-    """Gray-world white balance: scale channels so their averages match."""
-    channel_means = rgb.reshape(-1, 3).mean(axis=0)
+def _auto_white_balance(rgb: np.ndarray, strength: float, exclude_mask: np.ndarray | None = None) -> np.ndarray:
+    """Gray-world white balance: scale channels so their averages match.
+
+    ``exclude_mask`` (``(H, W)`` bool, True = excluded), if given, leaves
+    those pixels out of the *average* used to estimate the cast — a photo
+    dominated by one legitimately-warm memory color (skin filling most of
+    a portrait's frame is the classic case) otherwise reads as "a warm
+    cast" to gray-world and gets cooled toward gray, visibly draining/
+    tinting real skin tones blue. The gain is still applied to every
+    pixel, excluded or not — only the *estimate* ignores them.
+    """
+    pixels = rgb.reshape(-1, 3)
+    if exclude_mask is not None:
+        keep = ~exclude_mask.reshape(-1)
+        sample = pixels[keep] if keep.any() else pixels
+    else:
+        sample = pixels
+    channel_means = sample.mean(axis=0)
     gray_mean = float(channel_means.mean())
     if gray_mean < 1e-4:
         return rgb
@@ -287,18 +316,24 @@ def apply_post_preset_guard_to_buffer(buffer: ImageBuffer, strength: float = 1.0
     return apply_saturation_guard_to_buffer(guarded, strength)
 
 
-def apply_local_balance(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
+def apply_local_balance(
+    rgb: np.ndarray, strength: float = 1.0, white_balance_exclude_mask: np.ndarray | None = None
+) -> np.ndarray:
     """Return a corrected copy of ``rgb`` (``(H, W, 3)`` float32, values in ``[0, 1]``).
 
     ``strength`` scales the correction linearly; ``0.0`` returns ``rgb``
     unchanged (aside from a clip to ``[0, 1]``), ``1.0`` is the full effect.
+    ``white_balance_exclude_mask`` is passed through to
+    :func:`_auto_white_balance` (see there for why) — typically a detected
+    face's bounding box, so a portrait's skin tone doesn't get read as a
+    color cast.
     """
     if strength <= 0.0:
         no_op: np.ndarray = np.clip(rgb, 0.0, 1.0).astype(np.float32)
         return no_op
 
     clipped = np.clip(rgb, 0.0, 1.0).astype(np.float32)
-    clipped = _auto_white_balance(clipped, strength)
+    clipped = _auto_white_balance(clipped, strength, white_balance_exclude_mask)
     sigma = max(rgb.shape[0], rgb.shape[1]) * _BLUR_SIGMA_FRACTION
 
     luminance = clipped[..., 0] * 0.2126 + clipped[..., 1] * 0.7152 + clipped[..., 2] * 0.0722
@@ -324,8 +359,24 @@ def apply_local_balance(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
 
 
 def apply_local_balance_to_buffer(buffer: ImageBuffer, strength: float = 1.0) -> ImageBuffer:
-    """Apply :func:`apply_local_balance` to ``buffer``'s RGB channels, alpha untouched."""
-    rgb = apply_local_balance(buffer.data[..., :3], strength)
+    """Apply :func:`apply_local_balance` to ``buffer``'s RGB channels, alpha untouched.
+
+    Detects a face (the same detector used by Auto-suggest Film Simulation
+    and Suggest Composition Crop) and excludes it from the gray-world
+    white-balance estimate — see :func:`_auto_white_balance` for why.
+    """
+    from myphoto.color_engine.face_detector import detect_primary_face
+
+    exclude_mask = None
+    face = detect_primary_face(buffer)
+    if face is not None:
+        height, width = buffer.data.shape[:2]
+        exclude_mask = np.zeros((height, width), dtype=bool)
+        x0, y0 = int(face.x0 * width), int(face.y0 * height)
+        x1, y1 = int(face.x1 * width), int(face.y1 * height)
+        exclude_mask[y0:y1, x0:x1] = True
+
+    rgb = apply_local_balance(buffer.data[..., :3], strength, exclude_mask)
     if buffer.channels == 4:
         data = np.concatenate([rgb, buffer.data[..., 3:]], axis=-1)
     else:

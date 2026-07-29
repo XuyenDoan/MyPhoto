@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (Desktop) — Auto-Balance's white balance could blue-tint portraits
+
+- User-reported: the Film Simulation auto-picked for portrait photos
+  looked slightly blue-cast, not like award-quality color. Root cause:
+  gray-world white balance assumes a photo's colors average out to
+  neutral gray, which fails on its classic edge case — a photo dominated
+  by one legitimately strong memory color. A portrait where the face
+  fills a large fraction of the frame is exactly that case: the skin's
+  natural warmth reads as "a warm cast" and gets cooled toward gray,
+  visibly draining/blue-tinting the actual skin tone. Reproduced and
+  measured directly: with a face occupying 43% of a test frame, the
+  photo's warmth (R-minus-B) dropped from 0.243 to 0.111 (a 54% cut)
+  under the plain correction.
+  Fixed by detecting a face (the same local ONNX model Auto-suggest Film
+  Simulation and Suggest Composition Crop already use) in
+  `apply_local_balance_to_buffer()` and excluding it from the gray-world
+  *estimate* — the correction still applies to the whole photo, including
+  the face, it just isn't skewed by treating the face's own warmth as the
+  thing needing fixing. Same test case: warmth only drops to 0.217 (a 11%
+  cut) — much closer to the true color. `local_adjust.py`'s module
+  docstring updated to note this is the one place in the file that isn't
+  purely classical/deterministic (still fully local/offline, no network
+  call, no cost).
+
+### Changed (Desktop) — tighter control-panel spacing fixed
+
+- User-reported: checkbox rows in "Smart Correction" and similar groups
+  looked cramped, sitting almost flush against each other. Added vertical
+  spacing to every `QFormLayout` in `ControlsPanel` and between the panel's
+  group boxes, plus a small per-checkbox padding rule in the stylesheet.
+
 ### Fixed (Desktop) — full pipeline was impractically slow on high-resolution photos
 
 - Tested with a realistic ~12-megapixel photo (4000x3000, ~1-3MB as JPEG

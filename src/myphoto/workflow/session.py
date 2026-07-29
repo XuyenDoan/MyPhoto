@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, Signal
 
 from myphoto.batch.models import BatchJob
 from myphoto.batch.processor import BatchProcessor
+from myphoto.color_engine.local_adjust import apply_local_balance_to_buffer
 from myphoto.export_engine.models import ExportOptions
 from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
@@ -74,6 +75,11 @@ class EditSession(QObject):
         #: via a heuristic (not ML) scene analysis of the loaded image —
         #: see `preset_engine.auto_suggest`.
         self.auto_suggest_enabled = False
+        #: When enabled, over/under-exposed and over-saturated regions are
+        #: corrected (see `color_engine.local_adjust`) before the Base
+        #: Profile/Film Simulation are applied — never touches the
+        #: "Show Original" preview, which always stays the true source.
+        self.local_balance_enabled = False
 
     def list_base_profiles(self) -> list[Preset]:
         return self._preset_loader.list_base_profiles()
@@ -115,14 +121,15 @@ class EditSession(QObject):
         source_path = self.image_paths[self.current_index]
         try:
             original = downscaled(self._image_loader.load(source_path), self.PREVIEW_MAX_DIMENSION)
+            working = apply_local_balance_to_buffer(original) if self.local_balance_enabled else original
             if self.auto_suggest_enabled:
                 available_ids = {preset.id for preset in self._preset_loader.list_film_simulations()}
-                suggested_id = suggest_film_simulation_id(original, available_ids)
+                suggested_id = suggest_film_simulation_id(working, available_ids)
                 if suggested_id != self.film_simulation_id:
                     self.film_simulation_id = suggested_id
                     self.film_simulation_suggested.emit(suggested_id)
             rendered = self._preset_engine.render(
-                original,
+                working,
                 self.base_profile_id,
                 self.film_simulation_id,
                 self.strength,
@@ -142,6 +149,7 @@ class EditSession(QObject):
             strength=self.strength,
             export_options=export_options,
             grain_amount=self.grain_amount,
+            local_balance_enabled=self.local_balance_enabled,
         )
         self._batch_processor.run(job)
 

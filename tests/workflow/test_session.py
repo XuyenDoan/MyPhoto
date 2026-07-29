@@ -116,6 +116,29 @@ def test_auto_suggest_updates_film_simulation_and_emits_signal(
     assert session.film_simulation_id == "astia"
 
 
+def test_local_balance_affects_rendered_but_not_original_preview(
+    session: EditSession, tmp_path: Path, qtbot
+) -> None:
+    path = tmp_path / "photo.png"
+    array = np.zeros((32, 32, 3), dtype=np.uint8)
+    array[:, :16] = 250  # overexposed left half
+    array[:, 16:] = 5  # underexposed right half
+    Image.fromarray(array, mode="RGB").save(path)
+    session.add_images([path])
+    session.base_profile_id = "fujifilm"
+    session.film_simulation_id = "provia"
+    session.local_balance_enabled = True
+
+    with qtbot.waitSignal(session.preview_ready, timeout=2000) as blocker:
+        session.render_preview()
+
+    original, rendered = blocker.args
+    # "Show Original" must stay the true source, unaffected by the correction.
+    assert np.array_equal(original.data, array.astype(np.float32) / 255.0)
+    # The overexposed region should read darker after correction+rendering.
+    assert rendered.data[:, :16].mean() < original.data[:, :16].mean()
+
+
 def test_export_all_forwards_batch_finished(session: EditSession, tmp_path: Path, qtbot) -> None:
     path = tmp_path / "photo.png"
     _make_image(path)

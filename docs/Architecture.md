@@ -144,14 +144,22 @@ current Base Profile/Film Simulation/Strength/Grain state, and wires a
 
 - `render_preview()` loads the selected image, downsamples it
   (`workflow.preview.downscaled`, longer side capped at 1600px) for
-  interactive speed, optionally re-picks `film_simulation_id` when
-  `auto_suggest_enabled` is set (see below), runs it through
-  `PresetEngine.render()`, and emits `preview_ready(original, rendered)` or
-  `preview_failed(message)` — this is what backs the Before/After view.
-- `export_all(export_options)` builds a `BatchJob` from the full image
-  list and current settings and hands it to `BatchProcessor`, forwarding
-  its `progress`/`item_finished`/`finished` signals. Batch export always
+  interactive speed, optionally applies local exposure/saturation
+  correction when `local_balance_enabled` is set (see below) into a
+  separate `working` buffer — the `original` buffer used for the "Show
+  Original" toggle is never touched — optionally re-picks
+  `film_simulation_id` from `working` when `auto_suggest_enabled` is set,
+  runs `working` through `PresetEngine.render()`, and emits
+  `preview_ready(original, rendered)` or `preview_failed(message)` — this
+  is what backs the Before/After view.
+- `export_all(export_options)` builds a `BatchJob` (carrying
+  `local_balance_enabled` too) from the full image list and current
+  settings and hands it to `BatchProcessor`, forwarding its
+  `progress`/`item_finished`/`finished` signals. Batch export always
   processes full-resolution buffers; only the preview is downsampled.
+  `BatchItemRunnable` applies the same local-balance correction (before
+  `PresetEngine.render()`) as the preview path, so batch output matches
+  what was previewed.
 
 The `Strength` slider scales the film simulation's whole adjustment set
 (`ColorAdjustments.scaled()`); the `Film Grain` slider is independent —
@@ -197,6 +205,42 @@ left out of scope: it requires network access, an API key/cost, and
 sending the user's photos to a third party, none of which fit this
 project's fully-local, zero-cost design.
 
+### Auto-Balance Light & Color (local exposure/saturation correction)
+
+`color_engine.local_adjust.apply_local_balance()` corrects over/under-
+exposed and over-saturated *regions* of a photo independently, rather
+than one global exposure/saturation adjustment applied uniformly (the
+rest of the Color Pipeline's approach). Exposure technique: blur the
+luminance channel with a Gaussian whose radius scales with the image size
+(`_BLUR_SIGMA_FRACTION`) to estimate each region's local exposure level
+(the blur discards fine detail, keeping only "how bright is this general
+area"), then apply a per-pixel multiplicative RGB gain (capped to roughly
+±1 stop via `_MIN_EXPOSURE_GAIN`/`_MAX_EXPOSURE_GAIN`) — the same style
+of operation `ColorOperations.apply_exposure()` already uses globally,
+just spatially varying. Scaling R/G/B together this way preserves hue
+ratios exactly. (An earlier version shifted HLS lightness while holding
+saturation fixed instead; that was discarded during testing because HLS
+saturation is lightness-relative, so pulling a near-white/near-black
+pixel toward mid-gray while holding its HLS-S constant actually
+*increases* its real chroma — a visible false color cast on regions that
+should have stayed neutral. Multiplicative RGB gain doesn't have that
+failure mode.) Saturation technique (separate, applied after the exposure
+pass): pull down — never up — any pixel whose region's blurred HLS
+saturation exceeds `_MAX_TARGET_SATURATION` (capped by
+`_MAX_SATURATION_SHIFT`). One-directional deliberately: a genuinely
+gray/neutral region (a wall, an overcast sky) reads as "low saturation"
+but isn't broken — pushing color into it would introduce a false tint,
+not fix anything.
+`apply_local_balance_to_buffer()` applies this to an `ImageBuffer`'s RGB
+channels only, leaving alpha and metadata untouched. Runs before the Base
+Profile/Film Simulation pass, on the source photo. Deterministic
+image processing — no trained model, no network call, no cost.
+`EditSession.local_balance_enabled` (off by default) gates it in
+`render_preview()` (writing into a separate `working` buffer so the "Show
+Original" toggle stays the true, uncorrected source) and
+`BatchJob.local_balance_enabled` gates the equivalent step in
+`BatchItemRunnable` for full-resolution export.
+
 ## Batch processing
 
 `myphoto.batch.BatchProcessor` runs a `BatchJob` (source images + preset +
@@ -237,11 +281,13 @@ runnable (and the Qt signal object it owns) mid-emit and crash.
   default (preserving the photo's own aspect ratio, so portrait photos
   render tall and landscape photos render wide, instead of a fixed-shape
   crop), with Ctrl+wheel zooming further in/out from that fitted baseline.
-- `ControlsPanel` (right) — Base Profile / Film Simulation dropdowns
-  (populated from `PresetLoader`), an Auto-suggest Film Simulation
-  checkbox (off by default; disables the dropdown while on), a Strength
-  slider, a Film Grain checkbox (off by default) + amount slider, and the
-  export destination fields (format, quality, output folder).
+- `ControlsPanel` (right) — a "Smart Correction" group with the
+  Auto-Balance Light & Color checkbox (off by default), then a "Film
+  Simulation" group: Base Profile / Film Simulation dropdowns (populated
+  from `PresetLoader`), an Auto-suggest Film Simulation checkbox (off by
+  default; disables the dropdown while on), a Strength slider, a Film
+  Grain checkbox (off by default) + amount slider, and the export
+  destination fields (format, quality, output folder).
 - A bottom bar — progress bar, Cancel, and Export buttons.
 - `myphoto.gui.theme` applies a dark Fusion palette + QSS stylesheet
   application-wide (accent color, styled group boxes/buttons/sliders/

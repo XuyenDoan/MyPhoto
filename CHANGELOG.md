@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added (Desktop) — Auto-Balance Light & Color
+
+- A new "Auto-Balance Light & Color (beta)" checkbox (off by default,
+  Smart Correction group). When enabled, over/under-exposed and
+  over-saturated *regions* of the source photo are corrected
+  independently before the Base Profile/Film Simulation are applied —
+  e.g. a blown-out sky and a shaded foreground in the same frame get
+  pulled toward balanced exposure separately, instead of one global
+  exposure slider that can only compromise between the two.
+  `color_engine.local_adjust.apply_local_balance()`: blurs the luminance
+  channel with a large-radius Gaussian to estimate each region's local
+  exposure level, then applies a per-pixel multiplicative RGB gain
+  (capped to roughly ±1 stop) — the same style of operation the
+  pipeline's global `apply_exposure()` already uses, just spatially
+  varying. An HLS-lightness-shift version was tried first and discarded
+  during testing: shifting lightness while holding HLS saturation fixed
+  actually *increases* a near-white/near-black pixel's real chroma (HLS
+  saturation is lightness-relative), which showed up as a visible false
+  color cast on regions that should have stayed neutral. Saturation
+  correction (separate, over-saturated regions only, applied after the
+  exposure pass) is one-directional by design — a genuinely gray/neutral
+  region (a wall, an overcast sky) is never pushed toward more color.
+  Runs on the source photo, before the preset; the "Show Original"
+  preview is never affected. Deterministic image processing (no trained
+  model, no network, no cost) — wired through
+  `EditSession.local_balance_enabled` and `BatchJob.local_balance_enabled`
+  for both preview and batch export.
+
 ### Added (Desktop) — real face detection for auto-suggest
 
 - `preset_engine.face_detector`: auto-suggest's portrait signal now comes

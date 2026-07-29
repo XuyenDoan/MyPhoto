@@ -110,6 +110,7 @@ class MainWindow(QMainWindow):
         self._controls_panel.strength_changed.connect(self._on_strength_changed)
         self._controls_panel.grain_settings_changed.connect(self._on_grain_changed)
         self._controls_panel.auto_suggest_toggled.connect(self._on_auto_suggest_toggled)
+        self._controls_panel.local_balance_toggled.connect(self._on_local_balance_toggled)
 
         self._session.images_changed.connect(self._on_session_images_changed)
         self._session.preview_ready.connect(self._on_preview_ready)
@@ -169,6 +170,10 @@ class MainWindow(QMainWindow):
 
     def _on_auto_suggest_toggled(self, enabled: bool) -> None:
         self._session.auto_suggest_enabled = enabled
+        self._schedule_preview()
+
+    def _on_local_balance_toggled(self, enabled: bool) -> None:
+        self._session.local_balance_enabled = enabled
         self._schedule_preview()
 
     def _schedule_preview(self) -> None:

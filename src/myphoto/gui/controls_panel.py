@@ -37,9 +37,29 @@ class ControlsPanel(QWidget):
     #: is unchecked, regardless of the slider's saved position.
     grain_settings_changed = Signal(float)
     auto_suggest_toggled = Signal(bool)
+    local_balance_toggled = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+
+        # Off by default. Runs before the Base Profile/Film Simulation, on
+        # the source photo — see color_engine.local_adjust. Deterministic
+        # image processing, not a trained model.
+        self._local_balance_checkbox = QCheckBox("Auto-Balance Light & Color (beta)", self)
+        self._local_balance_checkbox.setChecked(False)
+        self._local_balance_checkbox.setToolTip(
+            "Corrects each region of the photo on its own: dims blown-out "
+            "highlights, lifts overly dark shadows, and tames patches of "
+            "extreme saturation — instead of one global slider that "
+            "compromises across the whole image. Runs before the preset, "
+            "on the source photo. Deterministic image processing, not a "
+            "trained model."
+        )
+        self._local_balance_checkbox.toggled.connect(self.local_balance_toggled.emit)
+
+        correction_group = QGroupBox("Smart Correction", self)
+        correction_form = QFormLayout(correction_group)
+        correction_form.addRow(self._local_balance_checkbox)
 
         self._base_profile_combo = QComboBox(self)
         self._base_profile_combo.currentIndexChanged.connect(self._emit_base_profile_changed)
@@ -112,6 +132,7 @@ class ControlsPanel(QWidget):
         export_form.addRow(naming_note)
 
         layout = QVBoxLayout(self)
+        layout.addWidget(correction_group)
         layout.addWidget(preset_group)
         layout.addWidget(export_group)
         layout.addStretch(1)

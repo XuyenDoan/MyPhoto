@@ -7,6 +7,7 @@ import threading
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from myphoto.batch.models import BatchItemResult, BatchJob
+from myphoto.color_engine.local_adjust import apply_local_balance_to_buffer
 from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
 from myphoto.preset_engine.engine import PresetEngine
@@ -44,6 +45,8 @@ class BatchItemRunnable(QRunnable):
             return
         try:
             buffer = self._image_loader.load(source_path)
+            if self._job.local_balance_enabled:
+                buffer = apply_local_balance_to_buffer(buffer)
             rendered = self._preset_engine.render(
                 buffer,
                 self._job.base_profile_id,

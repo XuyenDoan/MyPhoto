@@ -3,6 +3,8 @@ from pathlib import Path
 import numpy as np
 
 from myphoto.color_engine.local_adjust import (
+    _BLUR_DOWNSAMPLE_MAX_DIM,
+    _large_blur,
     apply_exposure_guard,
     apply_local_balance,
     apply_local_balance_to_buffer,
@@ -163,6 +165,37 @@ def test_post_preset_guard_combines_exposure_and_saturation_fixes() -> None:
     assert (right.max(axis=-1) - right.min(axis=-1)).mean() < (
         data[:, 32:].max(axis=-1) - data[:, 32:].min(axis=-1)
     ).mean()
+
+
+def test_large_blur_downsample_path_matches_full_res_blur_closely() -> None:
+    # A map bigger than the downsample threshold should take the
+    # downsample-blur-upsample path but still produce essentially the same
+    # broad-region result as blurring at full resolution directly.
+    size = _BLUR_DOWNSAMPLE_MAX_DIM + 200
+    rng = np.random.default_rng(0)
+    single_channel = _region_image(bright=0.9, dark=0.1, size=size)[..., 0]
+    single_channel = single_channel + rng.normal(0.0, 0.01, size=single_channel.shape).astype(np.float32)
+
+    import cv2
+
+    sigma = size * 0.08
+    exact = cv2.GaussianBlur(single_channel, (0, 0), sigma)
+    fast = _large_blur(single_channel, sigma)
+
+    assert fast.shape == exact.shape
+    assert np.abs(fast - exact).mean() < 0.01
+
+
+def test_large_blur_small_image_matches_direct_gaussian_blur_exactly() -> None:
+    import cv2
+
+    single_channel = _region_image(bright=0.8, dark=0.2, size=64)[..., 0]
+    sigma = 5.0
+
+    exact = cv2.GaussianBlur(single_channel, (0, 0), sigma)
+    fast = _large_blur(single_channel, sigma)
+
+    assert np.allclose(fast, exact)
 
 
 def test_apply_local_balance_to_buffer_preserves_alpha_and_metadata() -> None:

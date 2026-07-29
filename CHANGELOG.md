@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (Desktop) — full pipeline was impractically slow on high-resolution photos
+
+- Tested with a realistic ~12-megapixel photo (4000x3000, ~1-3MB as JPEG
+  depending on quality — matching a typical modern camera/phone export)
+  run through the full auto pipeline: it took **~136 seconds**, almost
+  entirely `local_adjust.py`'s large-radius Gaussian blurs (the pre-preset
+  exposure/saturation pass and both post-preset guards), run at full
+  resolution even though the blur only ever needs a coarse "how bright/
+  saturated is this broad area" estimate, not per-pixel precision.
+  Fixed by downsampling to at most `_BLUR_DOWNSAMPLE_MAX_DIM` (768px on
+  the longer side) before blurring and upsampling the result back,
+  whenever the source exceeds that size (`local_adjust._large_blur()`).
+  Same test photo: **~45 seconds**, a ~3x speedup, with detail metrics on
+  the final export unchanged (Laplacian energy 0.002881 vs. 0.002883
+  before the fix). Small images (everything in the existing test suite)
+  take the same exact direct-blur path as before, byte-for-byte.
+  Interactive preview already renders at a downscaled 1600px resolution,
+  so this mainly speeds up the once-per-photo full-resolution export step
+  on large source images, though it also helps preview responsiveness for
+  photos whose long side sits between 768px and 1600px.
+- Detail retention re-verified on the same 12MP photo, at both JPEG
+  quality 95 and 85: Laplacian energy and high-frequency FFT content both
+  came out well above the source (source 0.000573 -> exported 0.00288,
+  roughly 5x), confirming the earlier smaller-scale finding holds at a
+  realistic file size/resolution, not just on smaller test images.
+
 ### Changed (Desktop) — UI translated to Vietnamese
 
 - Every user-facing string in the desktop GUI (checkbox labels, tooltips,

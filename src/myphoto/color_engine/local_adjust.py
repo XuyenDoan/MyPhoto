@@ -136,6 +136,34 @@ _POST_PRESET_SHADOW_FLOOR = 0.04
 _POST_PRESET_EXPOSURE_MIN_GAIN = 0.6
 _POST_PRESET_EXPOSURE_MAX_GAIN = 1.8
 
+#: These blurs only need to capture "roughly how bright/saturated is this
+#: broad area", not per-pixel resolution — so on a large photo (a modern
+#: camera easily produces 12+ megapixels), blurring at full resolution
+#: wastes most of its time on precision the result doesn't use. Above this
+#: size, the map is downsampled before blurring and the result upsampled
+#: back, which is dramatically faster for a large-radius blur without a
+#: visible difference (a 12MP photo's local-exposure map doesn't need
+#: 12 million samples to describe "the sky is bright, the ground is dark").
+_BLUR_DOWNSAMPLE_MAX_DIM = 768
+
+
+def _large_blur(single_channel: np.ndarray, sigma: float) -> np.ndarray:
+    """Gaussian-blur a single-channel float32 map, downsampling first if the
+    image is larger than ``_BLUR_DOWNSAMPLE_MAX_DIM`` on its longer side.
+    """
+    height, width = single_channel.shape[:2]
+    longer_side = max(height, width)
+    if longer_side <= _BLUR_DOWNSAMPLE_MAX_DIM:
+        result: np.ndarray = cv2.GaussianBlur(single_channel, (0, 0), sigma)
+        return result
+
+    scale = _BLUR_DOWNSAMPLE_MAX_DIM / longer_side
+    small_size = (max(1, round(width * scale)), max(1, round(height * scale)))
+    small = cv2.resize(single_channel, small_size, interpolation=cv2.INTER_AREA)
+    blurred_small = cv2.GaussianBlur(small, (0, 0), max(sigma * scale, 1e-3))
+    upsampled: np.ndarray = cv2.resize(blurred_small, (width, height), interpolation=cv2.INTER_LINEAR)
+    return upsampled
+
 
 def _auto_white_balance(rgb: np.ndarray, strength: float) -> np.ndarray:
     """Gray-world white balance: scale channels so their averages match."""
@@ -158,7 +186,7 @@ def _pull_down_saturation(
     """
     hls = cv2.cvtColor(rgb, cv2.COLOR_RGB2HLS)
     saturation = hls[..., 2]
-    local_saturation = cv2.GaussianBlur(saturation, (0, 0), sigma)
+    local_saturation = _large_blur(saturation, sigma)
     excess = np.clip(local_saturation - target, 0.0, None)
     saturation_shift = np.clip(excess * strength, 0.0, max_shift)
     hls[..., 2] = np.clip(saturation - saturation_shift, 0.0, 1.0)
@@ -219,7 +247,7 @@ def apply_exposure_guard(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
     sigma = max(rgb.shape[0], rgb.shape[1]) * _BLUR_SIGMA_FRACTION
 
     luminance = clipped[..., 0] * 0.2126 + clipped[..., 1] * 0.7152 + clipped[..., 2] * 0.0722
-    local_luminance = cv2.GaussianBlur(luminance, (0, 0), sigma)
+    local_luminance = _large_blur(luminance, sigma)
 
     highlight_gain = np.where(
         local_luminance > _POST_PRESET_HIGHLIGHT_CEILING,
@@ -274,7 +302,7 @@ def apply_local_balance(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
     sigma = max(rgb.shape[0], rgb.shape[1]) * _BLUR_SIGMA_FRACTION
 
     luminance = clipped[..., 0] * 0.2126 + clipped[..., 1] * 0.7152 + clipped[..., 2] * 0.0722
-    local_luminance = cv2.GaussianBlur(luminance, (0, 0), sigma)
+    local_luminance = _large_blur(luminance, sigma)
 
     highlight_gain = np.where(
         local_luminance > _EXPOSURE_SAFE_HIGH,

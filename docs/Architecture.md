@@ -235,7 +235,17 @@ rest of the Color Pipeline's approach). Exposure technique: blur the
 luminance channel with a Gaussian whose radius scales with the image size
 (`_BLUR_SIGMA_FRACTION`) to estimate each region's local exposure level
 (the blur discards fine detail, keeping only "how bright is this general
-area"), then apply a per-pixel multiplicative RGB gain to any region whose
+area"). This blur (and the saturation one below, plus both post-preset
+guards) goes through `_large_blur()`, which downsamples the map to at
+most `_BLUR_DOWNSAMPLE_MAX_DIM` on its longer side before blurring and
+upsamples the result back, when the source is larger than that — a
+large-radius blur run at full resolution on a modern camera's 12+
+megapixel photo cost real, measured time (a 4000x3000 photo's full
+pipeline dropped from ~136s to ~45s after adding this), for a result
+that's already a broad, coarse estimate and doesn't need per-pixel
+precision. Small images (below the threshold, which covers every unit
+test) take the exact same direct-blur path as before. Then apply a
+per-pixel multiplicative RGB gain to any region whose
 local luminance strays outside a safe band
 (`_EXPOSURE_SAFE_LOW`/`_EXPOSURE_SAFE_HIGH`, 0.15-0.85), pulling it back
 toward the nearer edge of that band — capped to roughly ±1 stop via

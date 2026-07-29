@@ -6,8 +6,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -15,6 +17,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QSplitter,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
@@ -30,6 +33,15 @@ from myphoto.settings.store import SettingsStore
 from myphoto.workflow.session import EditSession
 
 _PREVIEW_DEBOUNCE_MS = 150
+
+#: The progress bar's range is fixed at this resolution (not "0 to number
+#: of images") so `batch_overall_progress` — updated after every pipeline
+#: checkpoint of every in-flight image, not just whole-item completion —
+#: can move it in small, frequent steps. `QPropertyAnimation` then eases
+#: between those steps instead of snapping, so the bar reads as a smooth
+#: crawl rather than a jumpy tick per finished image.
+_PROGRESS_RANGE = 1000
+_PROGRESS_ANIMATION_MS = 200
 
 
 class MainWindow(QMainWindow):
@@ -61,7 +73,19 @@ class MainWindow(QMainWindow):
         self._cancel_button = QPushButton("Hủy", self)
         self._cancel_button.setEnabled(False)
         self._progress_bar = QProgressBar(self)
-        self._progress_bar.setRange(0, 1)
+        self._progress_bar.setRange(0, _PROGRESS_RANGE)
+
+        self._progress_animation = QPropertyAnimation(self._progress_bar, b"value", self)
+        self._progress_animation.setDuration(_PROGRESS_ANIMATION_MS)
+        self._progress_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self._tray_icon: QSystemTrayIcon | None = None
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self._tray_icon = QSystemTrayIcon(self)
+            app = QApplication.instance()
+            app_icon = app.windowIcon() if isinstance(app, QApplication) else QIcon()
+            fallback_icon = self.style().standardIcon(self.style().StandardPixmap.SP_ComputerIcon)
+            self._tray_icon.setIcon(app_icon if not app_icon.isNull() else fallback_icon)
 
         self._preview_debounce = QTimer(self)
         self._preview_debounce.setSingleShot(True)
@@ -125,7 +149,7 @@ class MainWindow(QMainWindow):
             self._controls_panel.set_current_film_simulation
         )
         self._session.composition_suggested.connect(self._preview_panel.set_composition_suggestion)
-        self._session.batch_progress.connect(self._on_batch_progress)
+        self._session.batch_overall_progress.connect(self._on_batch_overall_progress)
         self._session.batch_finished.connect(self._on_batch_finished)
 
         self._export_button.clicked.connect(self._on_export_clicked)
@@ -222,7 +246,7 @@ class MainWindow(QMainWindow):
 
         self._export_button.setEnabled(False)
         self._cancel_button.setEnabled(True)
-        self._progress_bar.setRange(0, len(self._session.image_paths))
+        self._progress_animation.stop()
         self._progress_bar.setValue(0)
 
         if self._settings_store is not None:
@@ -236,17 +260,27 @@ class MainWindow(QMainWindow):
 
         self._session.export_all(options)
 
-    def _on_batch_progress(self, completed: int, total: int) -> None:
-        self._progress_bar.setRange(0, total)
-        self._progress_bar.setValue(completed)
+    def _on_batch_overall_progress(self, fraction: float) -> None:
+        target = round(fraction * _PROGRESS_RANGE)
+        self._progress_animation.stop()
+        self._progress_animation.setStartValue(self._progress_bar.value())
+        self._progress_animation.setEndValue(target)
+        self._progress_animation.start()
 
     def _on_batch_finished(self, results: list[BatchItemResult]) -> None:
         self._export_button.setEnabled(True)
         self._cancel_button.setEnabled(False)
+        self._progress_animation.stop()
+        self._progress_bar.setValue(_PROGRESS_RANGE)
+
         failed = [result for result in results if not result.succeeded]
         if failed:
-            self.statusBar().showMessage(
-                f"Xuất ảnh hoàn tất: {len(results) - len(failed)}/{len(results)} thành công", 8000
-            )
+            message = f"Xuất ảnh hoàn tất: {len(results) - len(failed)}/{len(results)} thành công"
+            self.statusBar().showMessage(message, 8000)
         else:
-            self.statusBar().showMessage(f"Xuất ảnh hoàn tất: {len(results)} ảnh", 5000)
+            message = f"Xuất ảnh hoàn tất: {len(results)} ảnh"
+            self.statusBar().showMessage(message, 5000)
+
+        if self._tray_icon is not None and results:
+            self._tray_icon.show()
+            self._tray_icon.showMessage("MyPhoto", message, QSystemTrayIcon.MessageIcon.Information, 5000)

@@ -103,8 +103,17 @@ def apply_film_grain(
     return result
 
 
-def apply_3d_lut(rgb: np.ndarray, lut: np.ndarray) -> np.ndarray:
-    """Apply an ``(N, N, N, 3)`` 3D LUT to ``rgb`` via trilinear interpolation."""
+#: Trilinear interpolation needs 8 full-size gathered-color arrays live at
+#: once (the 8 corners of the LUT cube surrounding each pixel) — computed
+#: over a whole high-resolution photo at once, that's a lot of peak memory
+#: for a step that's otherwise perfectly row-independent. Processing in
+#: row-band tiles bounds peak memory to roughly this many pixels' worth of
+#: those 8 arrays, regardless of the source photo's resolution, with the
+#: exact same math and result (just computed in pieces).
+_LUT_TILE_MAX_PIXELS = 400_000
+
+
+def _apply_3d_lut_tile(rgb: np.ndarray, lut: np.ndarray) -> np.ndarray:
     size = lut.shape[0]
     scaled = np.clip(rgb, 0.0, 1.0) * (size - 1)
     idx0 = np.floor(scaled).astype(np.int32)
@@ -129,6 +138,23 @@ def apply_3d_lut(rgb: np.ndarray, lut: np.ndarray) -> np.ndarray:
     c1 = c10 * (1 - fg) + c11 * fg
 
     result: np.ndarray = (c0 * (1 - fr) + c1 * fr).astype(np.float32)
+    return result
+
+
+def apply_3d_lut(rgb: np.ndarray, lut: np.ndarray) -> np.ndarray:
+    """Apply an ``(N, N, N, 3)`` 3D LUT to ``rgb`` via trilinear interpolation.
+
+    Processed in horizontal row-band tiles (see ``_LUT_TILE_MAX_PIXELS``)
+    to bound peak memory on a high-resolution photo; the math and result
+    are identical to processing the whole image at once.
+    """
+    height, width = rgb.shape[:2]
+    tile_rows = max(1, _LUT_TILE_MAX_PIXELS // max(width, 1))
+    if tile_rows >= height:
+        return _apply_3d_lut_tile(rgb, lut)
+
+    tiles = [_apply_3d_lut_tile(rgb[row : row + tile_rows], lut) for row in range(0, height, tile_rows)]
+    result: np.ndarray = np.concatenate(tiles, axis=0)
     return result
 
 

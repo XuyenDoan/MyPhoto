@@ -42,6 +42,10 @@ class EditSession(QObject):
     #: the preview to draw as a non-destructive overlay.
     composition_suggested = Signal(object)
     batch_progress = Signal(int, int)
+    #: Batch completion fraction (0.0-1.0), updated after every pipeline
+    #: checkpoint of every in-flight image, not just whole-item completion
+    #: — for a progress bar that moves in small, frequent steps.
+    batch_overall_progress = Signal(float)
     batch_item_finished = Signal(object)
     batch_finished = Signal(list)
 
@@ -73,6 +77,7 @@ class EditSession(QObject):
             )
         )
         self._batch_processor.progress.connect(self.batch_progress)
+        self._batch_processor.overall_progress.connect(self.batch_overall_progress)
         self._batch_processor.item_finished.connect(self.batch_item_finished)
         self._batch_processor.finished.connect(self.batch_finished)
 

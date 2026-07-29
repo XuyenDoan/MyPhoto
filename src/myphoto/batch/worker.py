@@ -18,9 +18,18 @@ from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
 from myphoto.preset_engine.engine import PresetEngine
 
+#: Fixed pipeline checkpoints, always emitted in this order regardless of
+#: which optional corrections are enabled for the job (a skipped stage
+#: still advances the count) — this gives a steady, evenly-spaced stream
+#: of progress ticks per item instead of the bar only moving once a whole
+#: (possibly slow, multi-second) image finishes end to end.
+_STAGE_COUNT = 8
+
 
 class _WorkerSignals(QObject):
     finished = Signal(object)  # BatchItemResult
+    #: (item_index, fraction 0.0-1.0 through this item's own pipeline)
+    stage_progress = Signal(int, float)
 
 
 class BatchItemRunnable(QRunnable):
@@ -49,14 +58,25 @@ class BatchItemRunnable(QRunnable):
         if self._cancel_event.is_set():
             self.signals.finished.emit(BatchItemResult(source_path, None, "cancelled"))
             return
+        stage = 0
+
+        def _tick() -> None:
+            nonlocal stage
+            stage += 1
+            self.signals.stage_progress.emit(self._index, stage / _STAGE_COUNT)
+
         try:
             buffer = self._image_loader.load(source_path)
+            _tick()
             if self._job.fix_chromatic_aberration_enabled:
                 buffer = correct_chromatic_aberration_to_buffer(buffer)
+            _tick()
             if self._job.auto_level_enabled:
                 buffer = apply_auto_level_to_buffer(buffer)
+            _tick()
             if self._job.local_balance_enabled:
                 buffer = apply_local_balance_to_buffer(buffer)
+            _tick()
             rendered = self._preset_engine.render(
                 buffer,
                 self._job.base_profile_id,
@@ -64,11 +84,15 @@ class BatchItemRunnable(QRunnable):
                 self._job.strength,
                 grain_amount=self._job.grain_amount,
             )
+            _tick()
             if self._job.local_balance_enabled:
                 rendered = apply_post_preset_guard_to_buffer(rendered)
+            _tick()
             if self._job.auto_sharpen_enabled:
                 rendered = apply_sharpen_to_buffer(rendered)
+            _tick()
             output_path = self._export_engine.export(rendered, self._job.export_options)
+            _tick()
             result = BatchItemResult(source_path, output_path)
         except Exception as exc:  # noqa: BLE001 - any failure becomes a per-item result, not a crash.
             result = BatchItemResult(source_path, None, str(exc))

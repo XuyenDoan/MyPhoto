@@ -1,3 +1,4 @@
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -53,6 +54,51 @@ def test_processes_all_items_and_reports_progress(
     for result in results:
         assert result.output_path is not None
         assert result.output_path.exists()
+
+
+def test_overall_progress_emits_many_small_monotonic_steps(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine
+) -> None:
+    # A progress bar should crawl forward in frequent small steps (one per
+    # pipeline checkpoint of every in-flight image), not jump only once
+    # per whole (possibly slow) image completion.
+    sources = []
+    for i in range(2):
+        path = tmp_path / f"img{i}.png"
+        _make_image(path)
+        sources.append(path)
+
+    options = ExportOptions(format="jpeg", output_dir=tmp_path / "out")
+    job = BatchJob(tuple(sources), "fujifilm", "provia", 1.0, options)
+
+    processor = BatchProcessor(preset_engine)
+    fractions: list[float] = []
+    processor.overall_progress.connect(fractions.append)
+
+    with qtbot.waitSignal(processor.finished, timeout=5000):
+        processor.run(job)
+
+    # 2 images x 8 pipeline checkpoints each = 16 stage ticks, plus each
+    # item's own completion re-emits once more.
+    assert len(fractions) >= 16
+    assert all(a <= b + 1e-9 for a, b in pairwise(fractions))
+    assert fractions[-1] == pytest.approx(1.0)
+
+
+def test_overall_progress_on_empty_job_completes_immediately(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine
+) -> None:
+    options = ExportOptions(format="png", output_dir=tmp_path / "out")
+    job = BatchJob((), "fujifilm", "provia", 1.0, options)
+
+    processor = BatchProcessor(preset_engine)
+    fractions: list[float] = []
+    processor.overall_progress.connect(fractions.append)
+
+    with qtbot.waitSignal(processor.finished, timeout=1000):
+        processor.run(job)
+
+    assert fractions == [1.0]
 
 
 def test_local_balance_enabled_still_succeeds(

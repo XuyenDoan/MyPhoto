@@ -26,12 +26,18 @@ class BatchProcessor(QObject):
 
     Signals:
         progress(completed, total): emitted after each item finishes.
+        overall_progress(fraction): emitted after every pipeline checkpoint
+            of every in-flight item (not just whole-item completion), so a
+            progress bar can move in small, frequent steps instead of
+            jumping only once per (possibly slow) full image. ``fraction``
+            is the batch's total completion, 0.0-1.0.
         item_finished(BatchItemResult): emitted after each item finishes.
         finished(list[BatchItemResult]): emitted once every item has finished
             (in source order), whether it succeeded, failed, or was cancelled.
     """
 
     progress = Signal(int, int)
+    overall_progress = Signal(float)
     item_finished = Signal(object)
     finished = Signal(list)
 
@@ -57,6 +63,9 @@ class BatchProcessor(QObject):
         #: Keeps runnables (and their signal objects) alive until they finish;
         #: without this, PySide6 can garbage-collect a QRunnable mid-emit.
         self._active_runnables: list[BatchItemRunnable] = []
+        #: Each item's own progress through its pipeline, 0.0-1.0 — averaged
+        #: across all items for ``overall_progress``.
+        self._item_fractions: list[float] = []
 
     def run(self, job: BatchJob) -> None:
         """Queue every item in ``job`` for background processing.
@@ -75,8 +84,10 @@ class BatchProcessor(QObject):
         self._cancel_event = threading.Event()
         self._results = [None] * len(job.source_paths)
         self._active_runnables = []
+        self._item_fractions = [0.0] * len(job.source_paths)
 
         if not job.source_paths:
+            self.overall_progress.emit(1.0)
             self.finished.emit([])
             return
 
@@ -91,6 +102,7 @@ class BatchProcessor(QObject):
             )
             runnable.setAutoDelete(False)
             runnable.signals.finished.connect(self._make_on_item_finished(index))
+            runnable.signals.stage_progress.connect(self._on_stage_progress)
             self._active_runnables.append(runnable)
             self._thread_pool.start(runnable)
 
@@ -98,12 +110,20 @@ class BatchProcessor(QObject):
         """Signal in-flight and not-yet-started items to skip processing."""
         self._cancel_event.set()
 
+    def _on_stage_progress(self, index: int, fraction: float) -> None:
+        if index < len(self._item_fractions):
+            self._item_fractions[index] = fraction
+            self.overall_progress.emit(sum(self._item_fractions) / len(self._item_fractions))
+
     def _make_on_item_finished(self, index: int) -> Callable[[BatchItemResult], None]:
         def _on_item_finished(result: BatchItemResult) -> None:
             self._results[index] = result
+            if index < len(self._item_fractions):
+                self._item_fractions[index] = 1.0
             completed = [r for r in self._results if r is not None]
             self.item_finished.emit(result)
             self.progress.emit(len(completed), len(self._results))
+            self.overall_progress.emit(sum(self._item_fractions) / len(self._item_fractions))
             if len(completed) == len(self._results):
                 self._active_runnables = []
                 self.finished.emit(completed)

@@ -438,6 +438,41 @@ Each `QRunnable` is created with `setAutoDelete(False)` and kept alive by
 the processor until it finishes — PySide6 can otherwise garbage-collect a
 runnable (and the Qt signal object it owns) mid-emit and crash.
 
+**Progress granularity.** `progress(completed, total)` only advances once
+a whole image finishes — fine for many small images, but chunky for a
+handful of large, slow ones. `BatchItemRunnable` additionally emits
+`stage_progress(index, fraction)` after each of 8 fixed pipeline
+checkpoints per image (load, chromatic-aberration fix, auto-level,
+local-balance, preset render, post-preset guard, sharpen, export — a
+checkpoint fires whether or not the corresponding optional stage actually
+ran for that job, so every image always reports exactly 8 evenly-spaced
+ticks). `BatchProcessor` averages every in-flight image's own fraction
+into `overall_progress(fraction: float, 0.0-1.0)`, updated far more often
+than `progress`. `MainWindow` keeps its `QProgressBar`'s range fixed at
+`_PROGRESS_RANGE` (1000) for the whole batch and animates its value toward
+each `overall_progress` update with a `QPropertyAnimation` (ease-out, 200ms)
+rather than snapping, so the bar reads as a smooth crawl instead of a
+jumpy per-image tick. `MainWindow` also shows a `QSystemTrayIcon`
+notification when `batch_finished` fires (skipped, not crashed, if the
+platform has no tray support).
+
+**Memory on large photos.** The Film Simulation preset's 3D LUT step
+(`color_engine.operations.apply_3d_lut()`) does trilinear interpolation,
+which needs 8 full-resolution "corner" arrays live at once — on a 12MP
+photo that's roughly 1.1GB of peak allocation for this one step, times
+however many images a batch processes concurrently. Fixed by processing
+in horizontal row-band tiles (`_LUT_TILE_MAX_PIXELS`, `_apply_3d_lut_tile()`),
+bounding peak allocation to a small, resolution-independent amount
+(~37MB per tile) with byte-identical output to the untiled path (verified
+directly: tiled vs. single-tile calls on the same input produce the exact
+same array). `chromatic_aberration.py`'s edge-threshold estimate was
+similarly using `np.percentile()` over every pixel just to find a
+heuristic cutoff — since the cutoff is already approximate, it's now
+estimated from a `_PERCENTILE_SAMPLE_SIZE` (200K-pixel) random subsample
+instead, with no measurable behavior change. Combined with the earlier
+large-radius-blur downsampling fix (`local_adjust._large_blur()`), full
+pipeline time on a 12MP test photo went from the original ~136s to ~27s.
+
 ## Quality priorities
 
 1. Color accuracy

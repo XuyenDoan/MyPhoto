@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Verified (Desktop) — no unwanted color cast across presets on portraits/landscapes
+
+- Re-checked color rendering across all 13 Film Simulations, on both a
+  portrait (face region) and a landscape (sky + ground regions), through
+  the full auto pipeline: skin stays warm-toned on every preset except
+  Acros (correctly neutral B&W) and Sepia (correctly yellow/warm-toned by
+  design); sky reads blue and foliage reads green on every preset except
+  those same two monochrome/toned presets. No yellow/blue/purple/other
+  unexpected cast found on any preset.
+
+### Fixed (Desktop) — export was slow and memory-heavy on large batches; progress bar was chunky
+
+- User-reported: exporting 10 photos over 10MB each was slow, used a lot
+  of RAM, and the progress bar jumped in coarse steps rather than
+  crawling smoothly; wanted a notification once export finishes.
+- **Speed + memory**: profiled the Film Simulation preset's 3D LUT
+  color-grading step (`color_engine.operations.apply_3d_lut()`) on a
+  realistic 12-megapixel photo — trilinear interpolation needs 8 full-
+  resolution "corner" arrays live at once, which on a large photo meant
+  ~1.1GB of peak allocation for that step alone, and a huge one at that
+  (multiplied by however many photos process concurrently in a batch,
+  since each runs on its own thread). Fixed by processing in horizontal
+  row-band tiles (`_LUT_TILE_MAX_PIXELS`), bounding peak allocation to
+  ~37MB regardless of photo resolution — a ~30x reduction for this step,
+  with byte-identical output (verified: tiled vs. single-tile processing
+  produce the exact same result). Also sped up
+  `chromatic_aberration.py`'s edge-strength threshold, which previously
+  sorted every pixel in the photo (`np.percentile` over the full image)
+  just to find a heuristic cutoff — now estimated from a 200K-pixel random
+  subsample, with no measurable change in behavior. Combined with the
+  large-radius-blur fix from the previous release, full-pipeline time on
+  the same 12MP test photo went from the original ~136s down to ~27s (a
+  ~5x total speedup), with detail metrics on the export unchanged.
+- **Progress bar smoothness**: it previously only advanced once per whole
+  photo finished (`BatchProcessor.progress(completed, total)`, one tick
+  per image) — coarse and jumpy for a handful of large, slow photos.
+  `BatchItemRunnable` now emits `stage_progress` after each of 8 fixed
+  pipeline checkpoints per photo (load, chromatic-aberration fix,
+  auto-level, local-balance, preset render, post-preset guard, sharpen,
+  export — whether or not each optional stage actually ran), and
+  `BatchProcessor.overall_progress(fraction)` averages every in-flight
+  photo's own checkpoint progress into one smoothly, frequently updating
+  0.0-1.0 value. `MainWindow` now animates the progress bar's value
+  toward each update with a `QPropertyAnimation` (200ms, ease-out) instead
+  of snapping, so it reads as a smooth crawl. Verified: a 3-photo batch
+  now emits 27 progress updates instead of 3-4, strictly non-decreasing,
+  ending exactly at 100%.
+- **Completion notification**: `MainWindow` now shows a system-tray
+  notification ("Xuất ảnh hoàn tất: N ảnh") when a batch finishes, in
+  addition to the existing status-bar message — visible even if the
+  window isn't focused. Degrades safely (skipped, not crashed) on a
+  system with no tray support.
+
 ### Fixed (Desktop) — Auto-Balance's white balance could blue-tint portraits
 
 - User-reported: the Film Simulation auto-picked for portrait photos

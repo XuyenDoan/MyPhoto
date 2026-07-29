@@ -99,3 +99,16 @@ def test_3d_lut_identity_is_approximately_noop() -> None:
     lut = ops.identity_lut(size=9)
     result = ops.apply_3d_lut(rgb, lut)
     np.testing.assert_allclose(result, rgb, atol=1e-2)
+
+
+def test_3d_lut_tiled_path_matches_single_tile_exactly() -> None:
+    # A non-identity LUT and an image bigger than one row-tile: the tiled
+    # path (used to bound peak memory on large photos) must produce the
+    # exact same result as processing the whole image in a single tile.
+    rgb = np.random.default_rng(1).random((2001, 200, 3)).astype(np.float32)
+    lut = np.random.default_rng(2).random((9, 9, 9, 3)).astype(np.float32)
+
+    tiled = ops.apply_3d_lut(rgb, lut)
+    single_tile = ops._apply_3d_lut_tile(rgb, lut)
+
+    np.testing.assert_array_equal(tiled, single_tile)

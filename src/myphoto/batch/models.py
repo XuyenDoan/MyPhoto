@@ -20,6 +20,8 @@ class BatchJob:
     grain_amount: float | None = None
     local_balance_enabled: bool = False
     auto_level_enabled: bool = False
+    fix_chromatic_aberration_enabled: bool = False
+    auto_sharpen_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)

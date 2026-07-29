@@ -93,6 +93,46 @@ def test_auto_level_enabled_still_succeeds(
     assert results[0].output_path.exists()
 
 
+def test_chromatic_aberration_fix_enabled_still_succeeds(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine
+) -> None:
+    path = tmp_path / "img.png"
+    _make_image(path)
+    options = ExportOptions(format="jpeg", output_dir=tmp_path / "out")
+    job = BatchJob(
+        (path,), "fujifilm", "provia", 1.0, options, fix_chromatic_aberration_enabled=True
+    )
+
+    processor = BatchProcessor(preset_engine)
+    with qtbot.waitSignal(processor.finished, timeout=5000) as blocker:
+        processor.run(job)
+
+    results = blocker.args[0]
+    assert len(results) == 1
+    assert results[0].succeeded
+    assert results[0].output_path is not None
+    assert results[0].output_path.exists()
+
+
+def test_auto_sharpen_enabled_still_succeeds(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine
+) -> None:
+    path = tmp_path / "img.png"
+    _make_image(path)
+    options = ExportOptions(format="jpeg", output_dir=tmp_path / "out")
+    job = BatchJob((path,), "fujifilm", "provia", 1.0, options, auto_sharpen_enabled=True)
+
+    processor = BatchProcessor(preset_engine)
+    with qtbot.waitSignal(processor.finished, timeout=5000) as blocker:
+        processor.run(job)
+
+    results = blocker.args[0]
+    assert len(results) == 1
+    assert results[0].succeeded
+    assert results[0].output_path is not None
+    assert results[0].output_path.exists()
+
+
 def test_missing_source_file_produces_failed_result(
     qtbot, tmp_path: Path, preset_engine: PresetEngine
 ) -> None:

@@ -113,6 +113,10 @@ class MainWindow(QMainWindow):
         self._controls_panel.local_balance_toggled.connect(self._on_local_balance_toggled)
         self._controls_panel.auto_level_toggled.connect(self._on_auto_level_toggled)
         self._controls_panel.composition_suggest_toggled.connect(self._on_composition_suggest_toggled)
+        self._controls_panel.fix_chromatic_aberration_toggled.connect(
+            self._on_fix_chromatic_aberration_toggled
+        )
+        self._controls_panel.auto_sharpen_toggled.connect(self._on_auto_sharpen_toggled)
 
         self._session.images_changed.connect(self._on_session_images_changed)
         self._session.preview_ready.connect(self._on_preview_ready)
@@ -187,6 +191,14 @@ class MainWindow(QMainWindow):
         self._session.composition_suggest_enabled = enabled
         if not enabled:
             self._preview_panel.set_composition_suggestion(None)
+        self._schedule_preview()
+
+    def _on_fix_chromatic_aberration_toggled(self, enabled: bool) -> None:
+        self._session.fix_chromatic_aberration_enabled = enabled
+        self._schedule_preview()
+
+    def _on_auto_sharpen_toggled(self, enabled: bool) -> None:
+        self._session.auto_sharpen_enabled = enabled
         self._schedule_preview()
 
     def _schedule_preview(self) -> None:

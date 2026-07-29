@@ -139,6 +139,49 @@ def test_local_balance_affects_rendered_but_not_original_preview(
     assert rendered.data[:, :16].mean() < original.data[:, :16].mean()
 
 
+def test_chromatic_aberration_fix_affects_rendered_but_not_original_preview(
+    session: EditSession, tmp_path: Path, qtbot
+) -> None:
+    path = tmp_path / "photo.png"
+    array = np.full((32, 32, 3), 200, dtype=np.uint8)
+    array[:, 16:] = (20, 20, 20)  # a strong edge down the middle
+    array[:, 15] = (150, 40, 140)  # purple fringe column right on the edge
+    Image.fromarray(array, mode="RGB").save(path)
+    session.add_images([path])
+    session.fix_chromatic_aberration_enabled = True
+
+    with qtbot.waitSignal(session.preview_ready, timeout=2000) as blocker:
+        session.render_preview()
+
+    original, rendered = blocker.args
+    assert np.array_equal(original.data, array.astype(np.float32) / 255.0)
+    original_chroma = original.data[0, 15].max() - original.data[0, 15].min()
+    rendered_chroma = rendered.data[0, 15].max() - rendered.data[0, 15].min()
+    assert rendered_chroma < original_chroma
+
+
+def test_auto_sharpen_increases_edge_contrast(session: EditSession, tmp_path: Path, qtbot) -> None:
+    path = tmp_path / "photo.png"
+    array = np.zeros((32, 32, 3), dtype=np.uint8)
+    array[:, :16] = 200
+    array[:, 16:] = 40
+    Image.fromarray(array, mode="RGB").save(path)
+    session.add_images([path])
+    session.base_profile_id = "fujifilm"
+    session.film_simulation_id = "provia"
+    session.auto_sharpen_enabled = True
+
+    with qtbot.waitSignal(session.preview_ready, timeout=2000) as blocker:
+        session.render_preview()
+
+    original, rendered = blocker.args
+    assert np.array_equal(original.data, array.astype(np.float32) / 255.0)
+    # Right at the edge, sharpening should widen the gap between the two sides.
+    original_gap = original.data[:, 14].mean() - original.data[:, 17].mean()
+    rendered_gap = rendered.data[:, 14].mean() - rendered.data[:, 17].mean()
+    assert rendered_gap >= original_gap
+
+
 def test_composition_suggest_emits_suggestion_when_enabled(
     session: EditSession, tmp_path: Path, qtbot, monkeypatch
 ) -> None:

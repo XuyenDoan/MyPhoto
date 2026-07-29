@@ -26,6 +26,13 @@ Just:
   tilted horizon via classical edge/line detection, cropping out the small
   corner gaps rotation leaves behind; only acts on a clear, correctable
   tilt, offline
+- Optional **Fix Chromatic Aberration** (beta) — desaturates the thin
+  purple/green lens fringe found along strong-contrast edges, without
+  touching genuinely purple/green subject matter away from an edge;
+  deterministic, offline
+- Optional **Auto Sharpen** (beta) — a noise-aware unsharp mask that
+  sharpens real edges without amplifying a preset's own film grain or
+  sensor noise; deterministic, offline
 - Optional **Suggest Composition Crop** (AI, beta) — proposes a
   rule-of-thirds crop as an overlay on the preview, using local face
   detection and visual saliency to find the main subject; a suggestion

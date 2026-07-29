@@ -40,6 +40,8 @@ class ControlsPanel(QWidget):
     local_balance_toggled = Signal(bool)
     auto_level_toggled = Signal(bool)
     composition_suggest_toggled = Signal(bool)
+    fix_chromatic_aberration_toggled = Signal(bool)
+    auto_sharpen_toggled = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -78,10 +80,43 @@ class ControlsPanel(QWidget):
         )
         self._auto_level_checkbox.toggled.connect(self.auto_level_toggled.emit)
 
+        # Off by default. Runs first, on the source photo — a lens defect,
+        # not a creative correction — see color_engine.chromatic_aberration.
+        # Classical edge detection + color-based defringing, not a trained
+        # model.
+        self._chromatic_aberration_checkbox = QCheckBox("Fix Chromatic Aberration (beta)", self)
+        self._chromatic_aberration_checkbox.setChecked(False)
+        self._chromatic_aberration_checkbox.setToolTip(
+            "Removes the thin purple/green fringe that shows up along "
+            "strong-contrast edges (a lens defect, worse toward the frame's "
+            "edges) — a dark branch against a bright sky is the classic "
+            "case. Only acts right at strong edges, so a genuinely purple "
+            "or green subject away from an edge is never touched."
+        )
+        self._chromatic_aberration_checkbox.toggled.connect(
+            self.fix_chromatic_aberration_toggled.emit
+        )
+
+        # Off by default. Runs last, after the preset and its grain — see
+        # color_engine.sharpen. Deterministic image processing (unsharp
+        # masking with a noise threshold), not a trained model.
+        self._auto_sharpen_checkbox = QCheckBox("Auto Sharpen (beta)", self)
+        self._auto_sharpen_checkbox.setChecked(False)
+        self._auto_sharpen_checkbox.setToolTip(
+            "Applies a mild capture-sharpening pass to the finished photo. "
+            "A noise threshold means low-amplitude detail — sensor noise, "
+            "a preset's own film grain — isn't amplified along with real "
+            "edges, so this sharpens without making a grainy photo look "
+            "noisier."
+        )
+        self._auto_sharpen_checkbox.toggled.connect(self.auto_sharpen_toggled.emit)
+
         correction_group = QGroupBox("Smart Correction", self)
         correction_form = QFormLayout(correction_group)
         correction_form.addRow(self._local_balance_checkbox)
         correction_form.addRow(self._auto_level_checkbox)
+        correction_form.addRow(self._chromatic_aberration_checkbox)
+        correction_form.addRow(self._auto_sharpen_checkbox)
 
         # Off by default. Unlike everything else in this panel, this never
         # touches the rendered/exported photo — it only draws a rule-of-

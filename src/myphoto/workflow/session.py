@@ -11,11 +11,13 @@ from PySide6.QtCore import QObject, Signal
 from myphoto.batch.models import BatchJob
 from myphoto.batch.processor import BatchProcessor
 from myphoto.color_engine.auto_level import apply_auto_level_to_buffer
+from myphoto.color_engine.chromatic_aberration import correct_chromatic_aberration_to_buffer
 from myphoto.color_engine.composition_suggest import suggest_crop
 from myphoto.color_engine.local_adjust import (
     apply_local_balance_to_buffer,
     apply_post_preset_guard_to_buffer,
 )
+from myphoto.color_engine.sharpen import apply_sharpen_to_buffer
 from myphoto.export_engine.models import ExportOptions
 from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
@@ -99,6 +101,15 @@ class EditSession(QObject):
         #: a proposal only, never applied to the actual rendered/exported
         #: pixels.
         self.composition_suggest_enabled = False
+        #: When enabled, purple/green lens-fringe color at strong-contrast
+        #: edges is desaturated toward neutral (see
+        #: `color_engine.chromatic_aberration`) before anything else runs —
+        #: never touches "Show Original".
+        self.fix_chromatic_aberration_enabled = False
+        #: When enabled, a noise-aware unsharp mask (see
+        #: `color_engine.sharpen`) runs last, after the Film Simulation
+        #: preset and its grain — never touches "Show Original".
+        self.auto_sharpen_enabled = False
 
     def list_base_profiles(self) -> list[Preset]:
         return self._preset_loader.list_base_profiles()
@@ -140,7 +151,12 @@ class EditSession(QObject):
         source_path = self.image_paths[self.current_index]
         try:
             original = downscaled(self._image_loader.load(source_path), self.PREVIEW_MAX_DIMENSION)
-            working = apply_auto_level_to_buffer(original) if self.auto_level_enabled else original
+            working = (
+                correct_chromatic_aberration_to_buffer(original)
+                if self.fix_chromatic_aberration_enabled
+                else original
+            )
+            working = apply_auto_level_to_buffer(working) if self.auto_level_enabled else working
             working = apply_local_balance_to_buffer(working) if self.local_balance_enabled else working
             if self.auto_suggest_enabled:
                 available_ids = {preset.id for preset in self._preset_loader.list_film_simulations()}
@@ -157,6 +173,8 @@ class EditSession(QObject):
             )
             if self.local_balance_enabled:
                 rendered = apply_post_preset_guard_to_buffer(rendered)
+            if self.auto_sharpen_enabled:
+                rendered = apply_sharpen_to_buffer(rendered)
         except Exception as exc:  # noqa: BLE001 - surfaced to the UI, never fatal.
             self.preview_failed.emit(str(exc))
             return
@@ -175,6 +193,8 @@ class EditSession(QObject):
             grain_amount=self.grain_amount,
             local_balance_enabled=self.local_balance_enabled,
             auto_level_enabled=self.auto_level_enabled,
+            fix_chromatic_aberration_enabled=self.fix_chromatic_aberration_enabled,
+            auto_sharpen_enabled=self.auto_sharpen_enabled,
         )
         self._batch_processor.run(job)
 

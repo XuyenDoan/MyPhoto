@@ -8,10 +8,12 @@ from PySide6.QtCore import QObject, QRunnable, Signal
 
 from myphoto.batch.models import BatchItemResult, BatchJob
 from myphoto.color_engine.auto_level import apply_auto_level_to_buffer
+from myphoto.color_engine.chromatic_aberration import correct_chromatic_aberration_to_buffer
 from myphoto.color_engine.local_adjust import (
     apply_local_balance_to_buffer,
     apply_post_preset_guard_to_buffer,
 )
+from myphoto.color_engine.sharpen import apply_sharpen_to_buffer
 from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
 from myphoto.preset_engine.engine import PresetEngine
@@ -49,6 +51,8 @@ class BatchItemRunnable(QRunnable):
             return
         try:
             buffer = self._image_loader.load(source_path)
+            if self._job.fix_chromatic_aberration_enabled:
+                buffer = correct_chromatic_aberration_to_buffer(buffer)
             if self._job.auto_level_enabled:
                 buffer = apply_auto_level_to_buffer(buffer)
             if self._job.local_balance_enabled:
@@ -62,6 +66,8 @@ class BatchItemRunnable(QRunnable):
             )
             if self._job.local_balance_enabled:
                 rendered = apply_post_preset_guard_to_buffer(rendered)
+            if self._job.auto_sharpen_enabled:
+                rendered = apply_sharpen_to_buffer(rendered)
             output_path = self._export_engine.export(rendered, self._job.export_options)
             result = BatchItemResult(source_path, output_path)
         except Exception as exc:  # noqa: BLE001 - any failure becomes a per-item result, not a crash.

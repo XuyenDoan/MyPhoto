@@ -307,10 +307,55 @@ formula for that problem). `apply_auto_level_to_buffer()` rotates/crops
 every channel of an `ImageBuffer` identically (so alpha stays aligned) and
 returns a new, smaller `ImageBuffer` when a correction was applied.
 `EditSession.auto_level_enabled` and `BatchJob.auto_level_enabled` gate it
-in the preview and batch-export pipelines respectively, running first —
-before Auto-Balance Light & Color and the preset — so later steps operate
-on the leveled photo; "Show Original" always shows the untouched,
-uncropped source.
+in the preview and batch-export pipelines respectively, running right
+after Fix Chromatic Aberration and before Auto-Balance Light & Color and
+the preset — so later steps operate on the leveled photo; "Show Original"
+always shows the untouched, uncropped source.
+
+### Fix Chromatic Aberration
+
+`color_engine.chromatic_aberration.correct_chromatic_aberration()`
+addresses a real lens defect — lateral chromatic aberration, worse toward
+a frame's edges and at high-contrast boundaries (a dark branch against a
+bright sky), which shows up as a thin purple/magenta or green fringe.
+This is *color-based defringing*, not full geometric lateral-CA
+correction (resampling the R and B channels at a per-photo-estimated
+radial scale) — the simpler technique was chosen because it's safer to
+run automatically and easier to verify: a Sobel gradient-magnitude map of
+the luminance channel identifies strong edges (top `_EDGE_PERCENTILE`,
+92nd), and only at those edges, a purple cast (`min(R,B) - G > 0`) or
+green cast (`G - max(R,B) > 0`) is pulled toward neutral, capped by
+`_MAX_DEFRINGE_SHIFT`. Flat regions and high-saturation subject matter
+away from a strong edge (a real purple flower, green foliage) are
+completely untouched, since the correction only ever acts where the edge
+mask is non-zero. `EditSession.fix_chromatic_aberration_enabled` and
+`BatchJob.fix_chromatic_aberration_enabled` gate it, running *first* in
+the pipeline — before Auto-Level's rotation — so defringing sees the
+original, un-interpolated pixels rather than ones softened by
+`cv2.warpAffine`'s bilinear resampling.
+
+### Auto Sharpen
+
+`color_engine.sharpen.apply_sharpen()` is a noise-aware unsharp mask:
+blur the image, isolate "detail" as original-minus-blur, then add that
+detail back in — but only where its magnitude clears
+`_DETAIL_THRESHOLD` (ramped over `_DETAIL_THRESHOLD_RAMP` to avoid a
+visible cutoff edge). Film grain (from a preset's own recipe) and sensor
+noise are both low-amplitude, spatially incoherent detail; without a
+threshold, unsharp masking amplifies them right along with genuine edges,
+making a grainy photo read as noisier rather than sharper. This is the
+same "threshold" control found in Lightroom/Photoshop's sharpening tools.
+Verified with an actual grain-heavy preset (Classic Neg, grain amount
+0.18 — the highest in the preset set): flat-region noise barely changes
+(~1.00x) after sharpening, while edge/detail energy (Laplacian variance)
+increases by 2-39% (average +19%) across a batch of test photos measured
+against the *same* rendered preset with vs. without sharpening.
+`EditSession.auto_sharpen_enabled` and `BatchJob.auto_sharpen_enabled`
+gate it, running *last* in the pipeline — after the Film Simulation
+preset (including its grain) and the post-preset guard — the conventional
+"output sharpening" position, since sharpening the pre-preset source
+would then have its effect partially undone or altered by the preset's
+own tone curve and LUT.
 
 ### Suggest Composition Crop (AI, suggestion only)
 

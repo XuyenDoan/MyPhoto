@@ -44,8 +44,10 @@ class ControlsPanel(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
-        # Off by default. Runs before the Base Profile/Film Simulation, on
-        # the source photo — see color_engine.local_adjust. Deterministic
+        # Off by default. Runs twice — before the Base Profile/Film
+        # Simulation (on the source photo) and again, more gently, after it
+        # (as a safety net against clipping the preset's own tone curve/LUT
+        # can reintroduce) — see color_engine.local_adjust. Deterministic
         # image processing, not a trained model.
         self._local_balance_checkbox = QCheckBox("Auto-Balance Light & Color (beta)", self)
         self._local_balance_checkbox.setChecked(False)
@@ -54,7 +56,9 @@ class ControlsPanel(QWidget):
             "highlights, lifts overly dark shadows, and tames patches of "
             "extreme saturation — instead of one global slider that "
             "compromises across the whole image. Runs before the preset, "
-            "on the source photo. Deterministic image processing, not a "
+            "on the source photo, and once more, gently, after the preset "
+            "to catch clipping the preset's own tone curve or color LUT "
+            "can reintroduce. Deterministic image processing, not a "
             "trained model."
         )
         self._local_balance_checkbox.toggled.connect(self.local_balance_toggled.emit)

@@ -3,8 +3,10 @@ from pathlib import Path
 import numpy as np
 
 from myphoto.color_engine.local_adjust import (
+    apply_exposure_guard,
     apply_local_balance,
     apply_local_balance_to_buffer,
+    apply_post_preset_guard_to_buffer,
     apply_saturation_guard,
     apply_saturation_guard_to_buffer,
 )
@@ -117,6 +119,50 @@ def test_apply_saturation_guard_to_buffer_preserves_alpha_and_metadata() -> None
     assert np.allclose(result.data[..., 3], 0.7)
     assert result.source_path == buffer.source_path
     assert not np.allclose(result.data[..., :3], buffer.data[..., :3])
+
+
+def test_exposure_guard_recovers_fully_clipped_highlight() -> None:
+    rgb = _region_image(bright=0.995, dark=0.5)
+
+    result = apply_exposure_guard(rgb, strength=1.0)
+
+    assert result[:, :32].mean() < rgb[:, :32].mean()
+
+
+def test_exposure_guard_recovers_fully_blocked_shadow() -> None:
+    rgb = _region_image(bright=0.5, dark=0.005)
+
+    result = apply_exposure_guard(rgb, strength=1.0)
+
+    assert result[:, 32:].mean() > rgb[:, 32:].mean()
+
+
+def test_exposure_guard_leaves_a_normal_contrast_range_alone() -> None:
+    # Within [_POST_PRESET_SHADOW_FLOOR, _POST_PRESET_HIGHLIGHT_CEILING] —
+    # a preset's normal punchy-but-not-clipped contrast must be untouched.
+    rgb = _region_image(bright=0.85, dark=0.15)
+
+    result = apply_exposure_guard(rgb, strength=1.0)
+
+    assert np.allclose(result, rgb, atol=1e-3)
+
+
+def test_post_preset_guard_combines_exposure_and_saturation_fixes() -> None:
+    size = 64
+    data = np.zeros((size, size, 3), dtype=np.float32)
+    data[:, : size // 2] = (0.995, 0.995, 0.995)  # clipped highlight, left half
+    data[:, size // 2 :] = (1.0, 0.0, 0.05)  # blown chroma, right half
+    buffer = ImageBuffer(
+        data=data, source_path=Path("/tmp/x.png"), color_space="sRGB", bit_depth=8, is_raw=False
+    )
+
+    result = apply_post_preset_guard_to_buffer(buffer)
+
+    assert result.data[:, :32].mean() < data[:, :32].mean()
+    right = result.data[:, 32:]
+    assert (right.max(axis=-1) - right.min(axis=-1)).mean() < (
+        data[:, 32:].max(axis=-1) - data[:, 32:].min(axis=-1)
+    ).mean()
 
 
 def test_apply_local_balance_to_buffer_preserves_alpha_and_metadata() -> None:

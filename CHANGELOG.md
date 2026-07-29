@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added (Desktop) — Auto-Balance Light & Color now also guards after the preset
+
+- Extends the existing "Auto-Balance Light & Color" checkbox to run a
+  second time, after the Film Simulation preset, not just before it:
+  `local_adjust.apply_exposure_guard()` (new) plus the existing
+  `apply_saturation_guard()`, combined as
+  `apply_post_preset_guard_to_buffer()`. A preset's own tone curve can
+  clip highlights/shadows the same way its 3D LUT can blow out saturation
+  (see the saturation-guard fix below) — this closes the equivalent gap
+  for exposure. One-directional and tight-banded
+  (`_POST_PRESET_HIGHLIGHT_CEILING`/`_POST_PRESET_SHADOW_FLOOR`) so a
+  preset's intended contrast (Acros' punch, Eterna's flatness) is left
+  alone; only genuine post-preset clipping gets recovered.
+
+### Fixed (Desktop) — pre-preset exposure correction was flattening real scene contrast
+
+- A 100-photo statistical test (see below) found that
+  `apply_local_balance()`'s exposure step — which nudged every region's
+  luminance toward a single fixed 0.5 target — was also "correcting" a
+  photo's genuine tonal contrast (a naturally bright sky next to a shaded
+  foreground, a lit face against a darker background) along with real
+  over/under-exposure, measurably flattening dynamic range. Replaced the
+  fixed-target gain with a safe-band approach
+  (`_EXPOSURE_SAFE_LOW`/`_EXPOSURE_SAFE_HIGH`, 0.15-0.85): a region is
+  only pulled back toward the nearer edge of that band once its local
+  luminance strays outside it, leaving normal-range contrast completely
+  untouched. Average measured luminance std across the test batch went
+  from before=0.153/after=0.055 (pre-fix — visibly flattened) to
+  before=0.153/after=0.152 (post-fix — preserved).
+
 ### Fixed (Desktop) — vivid Film Simulations could re-introduce oversaturation
 
 - A 40-photo statistical test (synthetic scenes across portrait/landscape/

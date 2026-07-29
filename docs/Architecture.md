@@ -235,10 +235,21 @@ rest of the Color Pipeline's approach). Exposure technique: blur the
 luminance channel with a Gaussian whose radius scales with the image size
 (`_BLUR_SIGMA_FRACTION`) to estimate each region's local exposure level
 (the blur discards fine detail, keeping only "how bright is this general
-area"), then apply a per-pixel multiplicative RGB gain (capped to roughly
-±1 stop via `_MIN_EXPOSURE_GAIN`/`_MAX_EXPOSURE_GAIN`) — the same style
-of operation `ColorOperations.apply_exposure()` already uses globally,
-just spatially varying. Scaling R/G/B together this way preserves hue
+area"), then apply a per-pixel multiplicative RGB gain to any region whose
+local luminance strays outside a safe band
+(`_EXPOSURE_SAFE_LOW`/`_EXPOSURE_SAFE_HIGH`, 0.15-0.85), pulling it back
+toward the nearer edge of that band — capped to roughly ±1 stop via
+`_MIN_EXPOSURE_GAIN`/`_MAX_EXPOSURE_GAIN`. An earlier version targeted a
+single fixed 0.5 luminance for every region instead (the same style of
+operation `ColorOperations.apply_exposure()` uses globally, just spatially
+varying); a statistical test across a batch of synthetic photos found this
+also "corrected" ordinary scene contrast along with genuine defects — a
+naturally bright sky next to a shaded foreground both got pulled toward
+the same brightness, measurably flattening dynamic range (average
+luminance std dropped from 0.153 pre-correction to 0.055 post-correction
+across the test batch). The safe-band approach leaves anything merely
+*different*, not actually blown/blocked, alone (post-fix: 0.153 to 0.152,
+essentially unchanged). Scaling R/G/B together this way preserves hue
 ratios exactly. (An earlier version shifted HLS lightness while holding
 saturation fixed instead; that was discarded during testing because HLS
 saturation is lightness-relative, so pulling a near-white/near-black
@@ -261,6 +272,23 @@ image processing — no trained model, no network call, no cost.
 Original" toggle stays the true, uncorrected source) and
 `BatchJob.local_balance_enabled` gates the equivalent step in
 `BatchItemRunnable` for full-resolution export.
+
+The same checkbox also gates a second stage, `apply_post_preset_guard_to_buffer()`
+(`apply_exposure_guard()` + `apply_saturation_guard()`), run *after*
+`PresetEngine.render()` rather than before it. The Film Simulation preset
+has its own tone curve and hue-selective 3D LUT, which can reintroduce
+clipping or blown-out saturation the pre-preset pass had no way to
+anticipate (it only sees the un-styled source). Both guard functions are
+deliberately gentler and tighter-banded than their pre-preset
+counterparts — `_POST_PRESET_HIGHLIGHT_CEILING`/`_POST_PRESET_SHADOW_FLOOR`
+(0.95/0.04) and `_POST_PRESET_MAX_SATURATION` (0.9) sit close to the true
+clipping edges, so a preset's intended character (Acros' punchy contrast,
+Velvia's vividness) is left alone; only genuine post-preset clipping gets
+pulled back. The saturation guard additionally uses a much tighter blur
+radius (`_POST_PRESET_SATURATION_BLUR_FRACTION`, vs. the wider
+`_BLUR_SIGMA_FRACTION` used everywhere else) since a hue-selective LUT can
+introduce thin, sharply-bounded bands of blown chroma along a strong color
+edge that a wide blur would average away and under-correct.
 
 ### Auto-Level Horizon
 

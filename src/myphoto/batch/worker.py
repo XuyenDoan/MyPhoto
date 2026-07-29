@@ -10,7 +10,7 @@ from myphoto.batch.models import BatchItemResult, BatchJob
 from myphoto.color_engine.auto_level import apply_auto_level_to_buffer
 from myphoto.color_engine.local_adjust import (
     apply_local_balance_to_buffer,
-    apply_saturation_guard_to_buffer,
+    apply_post_preset_guard_to_buffer,
 )
 from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
@@ -61,7 +61,7 @@ class BatchItemRunnable(QRunnable):
                 grain_amount=self._job.grain_amount,
             )
             if self._job.local_balance_enabled:
-                rendered = apply_saturation_guard_to_buffer(rendered)
+                rendered = apply_post_preset_guard_to_buffer(rendered)
             output_path = self._export_engine.export(rendered, self._job.export_options)
             result = BatchItemResult(source_path, output_path)
         except Exception as exc:  # noqa: BLE001 - any failure becomes a per-item result, not a crash.

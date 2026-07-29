@@ -173,7 +173,7 @@ without changing how strongly the rest of the look is applied.
 deterministic nearest-centroid classifier over 6 features: warmth,
 brightness, contrast, mean saturation, the fraction of pixels in typical
 foliage/sky hue ranges (via `OpenCVColorMath.rgb_to_hls`), and a real
-face-detection confidence from `preset_engine.face_detector` (a small
+face-detection confidence from `color_engine.face_detector` (a small
 pretrained ONNX model — see below). It finds whichever shipped Film
 Simulation's hand-authored "typical photo" feature vector is closest
 (normalized Euclidean distance across all 6 features at once).
@@ -188,7 +188,7 @@ ambiguous/ordinary photos land on it by default. `EditSession.auto_suggest_enabl
 changes `film_simulation_id`, `film_simulation_suggested(str)` fires so
 `ControlsPanel` can move its dropdown to match.
 
-`preset_engine.face_detector.face_confidence()` runs "Ultra-Light-Fast-
+`color_engine.face_detector.face_confidence()` runs "Ultra-Light-Fast-
 Generic-Face-Detector-1MB" (MIT-licensed, bundled at
 `models/face_detector.onnx`) via `onnxruntime` (CPU) — a genuine trained
 model, not a heuristic, but still fully local: no network call, no
@@ -205,7 +205,28 @@ left out of scope: it requires network access, an API key/cost, and
 sending the user's photos to a third party, none of which fit this
 project's fully-local, zero-cost design.
 
-### Auto-Balance Light & Color (local exposure/saturation correction)
+`face_detector.py` lives in `color_engine`, not `preset_engine`, even
+though `auto_suggest` (in `preset_engine`) is its original caller: the
+composition-crop-suggestion feature (below) also needs face detection and
+lives in `color_engine`, and the documented layering is one-directional
+(Preset Engine may depend on Color Engine, never the reverse), so the
+detector belongs at the lower layer. `preset_engine.auto_suggest` imports
+`face_confidence` from `myphoto.color_engine.face_detector`.
+`detect_primary_face()` additionally returns a `FaceBox` (fractional
+`x0/y0/x1/y1` bounding box + confidence, with a `.center` property) for
+the highest-confidence face, used by composition-crop-suggestion to locate
+the subject rather than just detect its presence.
+
+### Auto-Balance Light & Color (white balance + local exposure/saturation correction)
+
+`apply_local_balance()` first runs `_auto_white_balance()`, a gray-world
+white balance: it scales each RGB channel so its average roughly matches
+the other two (a photo with no color cast has roughly equal R/G/B
+channel means), with the correction strength capped
+(`_MIN_WHITE_BALANCE_GAIN`/`_MAX_WHITE_BALANCE_GAIN`) so an obvious cast
+(warm tungsten light, a cool overcast sky) gets neutralized without
+overcorrecting a scene that's legitimately one-color-dominant (a sunset,
+a dense forest).
 
 `color_engine.local_adjust.apply_local_balance()` corrects over/under-
 exposed and over-saturated *regions* of a photo independently, rather
@@ -240,6 +261,65 @@ image processing — no trained model, no network call, no cost.
 Original" toggle stays the true, uncorrected source) and
 `BatchJob.local_balance_enabled` gates the equivalent step in
 `BatchItemRunnable` for full-resolution export.
+
+### Auto-Level Horizon
+
+`color_engine.auto_level.detect_tilt_degrees()` finds a photo's dominant
+near-horizontal line using classical CV, no trained model: Canny edge
+detection feeding `cv2.HoughLinesP` (probabilistic Hough transform), the
+resulting line segments filtered to those within
+`_MAX_CORRECTABLE_ANGLE_DEGREES` of horizontal, then averaged weighted by
+each segment's length. `auto_level()` only rotates (`cv2.warpAffine`) when
+the detected tilt is at least `_MIN_ANGLE_TO_CORRECT_DEGREES` — a photo
+with no confident line, or one that's already level, is returned
+unchanged. Rotating a rectangle leaves the corners empty, so the rotated
+image is cropped to the largest axis-aligned rectangle that still fits
+entirely inside it (`_largest_inscribed_rect()`, the standard closed-form
+formula for that problem). `apply_auto_level_to_buffer()` rotates/crops
+every channel of an `ImageBuffer` identically (so alpha stays aligned) and
+returns a new, smaller `ImageBuffer` when a correction was applied.
+`EditSession.auto_level_enabled` and `BatchJob.auto_level_enabled` gate it
+in the preview and batch-export pipelines respectively, running first —
+before Auto-Balance Light & Color and the preset — so later steps operate
+on the leveled photo; "Show Original" always shows the untouched,
+uncropped source.
+
+### Suggest Composition Crop (AI, suggestion only)
+
+`color_engine.composition_suggest.suggest_crop()` is deliberately
+non-destructive: every other correction in this app can modify the
+rendered/exported photo, but cropping is a creative decision, not a
+technical fix, so this one only ever proposes — it returns a
+`CropSuggestion` (x/y/width/height + which rule-of-thirds point it
+targets + `source`, `"face"` or `"saliency"`) for `PreviewPanel` to draw
+as an overlay (a semi-transparent rule-of-thirds grid plus an orange
+rectangle) on top of the rendered preview pixmap; the underlying
+`ImageBuffer` pixels, and everything `ExportEngine` writes to disk, are
+never touched.
+
+Subject localization tries `color_engine.face_detector.detect_primary_face()`
+first (the same ONNX model Auto-suggest Film Simulation uses); if no face
+is found, it falls back to classical visual saliency
+(`cv2.saliency.StaticSaliencySpectralResidual_create()`, from
+`opencv-contrib-python-headless` — the project switched from the base
+`opencv-python-headless` package for this, since `cv2.saliency` is a
+contrib-only module): the saliency map is blurred, thresholded at its
+90th percentile, and the centroid of the surviving pixels stands in for
+"the interesting part of the photo." `suggest_crop()` then scores
+candidate crops — three crop scales × the four rule-of-thirds
+intersection points — by how close the subject lands to each candidate's
+target thirds point (with a small bonus toward the least-aggressive crop
+among near-equal scores) and returns the best one, preserving the
+original aspect ratio.
+
+`EditSession.composition_suggest_enabled` (off by default, its own
+"Composition (suggestion only)" group in `ControlsPanel`, separate from
+"Smart Correction" since this never modifies pixels) gates a
+`composition_suggested(CropSuggestion | None)` signal emitted after every
+`render_preview()`; `PreviewPanel.set_composition_suggestion()` draws (or
+clears) the overlay. There is intentionally no `BatchJob` equivalent —
+this is a preview-only aid for the photographer to act on themselves, not
+an automated export-time transformation.
 
 ## Batch processing
 

@@ -139,6 +139,69 @@ def test_local_balance_affects_rendered_but_not_original_preview(
     assert rendered.data[:, :16].mean() < original.data[:, :16].mean()
 
 
+def test_composition_suggest_emits_suggestion_when_enabled(
+    session: EditSession, tmp_path: Path, qtbot, monkeypatch
+) -> None:
+    from myphoto.color_engine.composition_suggest import CropSuggestion
+
+    fake_suggestion = CropSuggestion(x=1, y=2, width=3, height=4, target_thirds_point=(1 / 3, 1 / 3), source="face")
+    monkeypatch.setattr("myphoto.workflow.session.suggest_crop", lambda buffer: fake_suggestion)
+
+    path = tmp_path / "photo.png"
+    _make_image(path)
+    session.add_images([path])
+    session.composition_suggest_enabled = True
+
+    with qtbot.waitSignal(session.composition_suggested, timeout=2000) as blocker:
+        session.render_preview()
+
+    assert blocker.args[0] is fake_suggestion
+
+
+def test_composition_suggest_disabled_emits_nothing(
+    session: EditSession, tmp_path: Path, qtbot
+) -> None:
+    path = tmp_path / "photo.png"
+    _make_image(path)
+    session.add_images([path])
+    session.composition_suggest_enabled = False
+
+    events: list[object] = []
+    session.composition_suggested.connect(lambda suggestion: events.append(suggestion))
+
+    with qtbot.waitSignal(session.preview_ready, timeout=2000):
+        session.render_preview()
+
+    assert events == []
+
+
+def test_auto_level_crops_rendered_but_not_original_preview(
+    session: EditSession, tmp_path: Path, qtbot
+) -> None:
+    import cv2
+
+    def tilted_horizon(size: int = 300, degrees: float = 8.0) -> np.ndarray:
+        rgb = np.zeros((size, size, 3), dtype=np.float32)
+        rgb[: size // 2] = (0.85, 0.85, 0.9)
+        rgb[size // 2 :] = (0.15, 0.35, 0.15)
+        matrix = cv2.getRotationMatrix2D((size / 2, size / 2), degrees, 1.0)
+        return cv2.warpAffine(rgb, matrix, (size, size), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+
+    path = tmp_path / "tilted.png"
+    array = (tilted_horizon() * 255).astype(np.uint8)
+    Image.fromarray(array, mode="RGB").save(path)
+    session.add_images([path])
+    session.auto_level_enabled = True
+
+    with qtbot.waitSignal(session.preview_ready, timeout=2000) as blocker:
+        session.render_preview()
+
+    original, rendered = blocker.args
+    assert original.height == 300 and original.width == 300
+    assert rendered.height < 300
+    assert rendered.width < 300
+
+
 def test_export_all_forwards_batch_finished(session: EditSession, tmp_path: Path, qtbot) -> None:
     path = tmp_path / "photo.png"
     _make_image(path)

@@ -24,7 +24,7 @@ dependencies = [
     "PySide6",
     "numpy",
     "pillow",
-    "opencv-python-headless",
+    "opencv-contrib-python-headless",
     "rawpy",
     "OpenColorIO",
     "piexif",

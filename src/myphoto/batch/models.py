@@ -19,6 +19,7 @@ class BatchJob:
     export_options: ExportOptions
     grain_amount: float | None = None
     local_balance_enabled: bool = False
+    auto_level_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -38,6 +38,8 @@ class ControlsPanel(QWidget):
     grain_settings_changed = Signal(float)
     auto_suggest_toggled = Signal(bool)
     local_balance_toggled = Signal(bool)
+    auto_level_toggled = Signal(bool)
+    composition_suggest_toggled = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -57,9 +59,47 @@ class ControlsPanel(QWidget):
         )
         self._local_balance_checkbox.toggled.connect(self.local_balance_toggled.emit)
 
+        # Off by default. Can crop the photo slightly (rotating a rectangle
+        # to level it leaves corner gaps that must be cropped out) — see
+        # color_engine.auto_level. Classical edge/line detection, not a
+        # trained model.
+        self._auto_level_checkbox = QCheckBox("Auto-Level Horizon (beta)", self)
+        self._auto_level_checkbox.setChecked(False)
+        self._auto_level_checkbox.setToolTip(
+            "Detects a tilted horizon or other dominant straight line and "
+            "rotates the photo to level it. Rotating necessarily crops a "
+            "small amount off each edge. Only acts on a clear, correctable "
+            "tilt — a deliberately dramatic angled shot, or a photo with no "
+            "confident line, is left untouched."
+        )
+        self._auto_level_checkbox.toggled.connect(self.auto_level_toggled.emit)
+
         correction_group = QGroupBox("Smart Correction", self)
         correction_form = QFormLayout(correction_group)
         correction_form.addRow(self._local_balance_checkbox)
+        correction_form.addRow(self._auto_level_checkbox)
+
+        # Off by default. Unlike everything else in this panel, this never
+        # touches the rendered/exported photo — it only draws a rule-of-
+        # thirds grid + a suggested crop rectangle on the preview, for the
+        # user to accept (crop it themselves), adjust, or ignore. Uses the
+        # same face detector as Auto-suggest, falling back to classical
+        # saliency detection when no face is found — see
+        # color_engine.composition_suggest.
+        self._composition_suggest_checkbox = QCheckBox("Suggest Composition Crop (AI, beta)", self)
+        self._composition_suggest_checkbox.setChecked(False)
+        self._composition_suggest_checkbox.setToolTip(
+            "Draws a rule-of-thirds grid and a suggested crop as a guide "
+            "over the preview — a proposal only, never applied to the "
+            "exported photo. Finds the main subject via a small face-"
+            "detection model, falling back to general visual-saliency "
+            "detection when no face is found."
+        )
+        self._composition_suggest_checkbox.toggled.connect(self.composition_suggest_toggled.emit)
+
+        composition_group = QGroupBox("Composition (suggestion only)", self)
+        composition_form = QFormLayout(composition_group)
+        composition_form.addRow(self._composition_suggest_checkbox)
 
         self._base_profile_combo = QComboBox(self)
         self._base_profile_combo.currentIndexChanged.connect(self._emit_base_profile_changed)
@@ -133,6 +173,7 @@ class ControlsPanel(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(correction_group)
+        layout.addWidget(composition_group)
         layout.addWidget(preset_group)
         layout.addWidget(export_group)
         layout.addStretch(1)

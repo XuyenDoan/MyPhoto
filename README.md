@@ -18,9 +18,18 @@ Just:
   **Film Simulation** look (Provia, Velvia, Astia, Classic Chrome,
   Classic Neg, PRO Neg. Hi, PRO Neg. Std, Eterna, Eterna Bleach Bypass,
   Acros, Sepia, Nostalgic Neg, Reala Ace)
-- Optional **Auto-Balance Light & Color** (beta) — corrects over/under-
-  exposed and over-saturated *regions* of a photo independently (not one
-  global slider), before the preset is applied; deterministic, offline
+- Optional **Auto-Balance Light & Color** (beta) — neutralizes an overall
+  color cast (white balance) and corrects over/under-exposed and
+  over-saturated *regions* of a photo independently (not one global
+  slider), before the preset is applied; deterministic, offline
+- Optional **Auto-Level Horizon** (beta) — detects and straightens a
+  tilted horizon via classical edge/line detection, cropping out the small
+  corner gaps rotation leaves behind; only acts on a clear, correctable
+  tilt, offline
+- Optional **Suggest Composition Crop** (AI, beta) — proposes a
+  rule-of-thirds crop as an overlay on the preview, using local face
+  detection and visual saliency to find the main subject; a suggestion
+  only, it never modifies the rendered or exported photo
 - Optional **Auto-suggest Film Simulation** (beta) — picks a preset from
   the photo's color statistics plus a real local face detector (small
   ONNX model, fully offline, no cost); always overridable

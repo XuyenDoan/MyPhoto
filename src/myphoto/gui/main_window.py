@@ -111,6 +111,8 @@ class MainWindow(QMainWindow):
         self._controls_panel.grain_settings_changed.connect(self._on_grain_changed)
         self._controls_panel.auto_suggest_toggled.connect(self._on_auto_suggest_toggled)
         self._controls_panel.local_balance_toggled.connect(self._on_local_balance_toggled)
+        self._controls_panel.auto_level_toggled.connect(self._on_auto_level_toggled)
+        self._controls_panel.composition_suggest_toggled.connect(self._on_composition_suggest_toggled)
 
         self._session.images_changed.connect(self._on_session_images_changed)
         self._session.preview_ready.connect(self._on_preview_ready)
@@ -118,6 +120,7 @@ class MainWindow(QMainWindow):
         self._session.film_simulation_suggested.connect(
             self._controls_panel.set_current_film_simulation
         )
+        self._session.composition_suggested.connect(self._preview_panel.set_composition_suggestion)
         self._session.batch_progress.connect(self._on_batch_progress)
         self._session.batch_finished.connect(self._on_batch_finished)
 
@@ -174,6 +177,16 @@ class MainWindow(QMainWindow):
 
     def _on_local_balance_toggled(self, enabled: bool) -> None:
         self._session.local_balance_enabled = enabled
+        self._schedule_preview()
+
+    def _on_auto_level_toggled(self, enabled: bool) -> None:
+        self._session.auto_level_enabled = enabled
+        self._schedule_preview()
+
+    def _on_composition_suggest_toggled(self, enabled: bool) -> None:
+        self._session.composition_suggest_enabled = enabled
+        if not enabled:
+            self._preview_panel.set_composition_suggestion(None)
         self._schedule_preview()
 
     def _schedule_preview(self) -> None:

@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added (Desktop) — Auto-Level Horizon
+
+- A new "Auto-Level Horizon (beta)" checkbox (off by default, Smart
+  Correction group). When enabled, `color_engine.auto_level` detects a
+  tilted horizon (or other dominant straight line) via classical edge/line
+  detection — Canny edges feeding a probabilistic Hough transform
+  (`cv2.HoughLinesP`), filtered to near-horizontal candidates and averaged
+  by line length — and rotates the photo to level it. Rotating a rectangle
+  necessarily leaves gaps at the corners, so the result is cropped down to
+  the largest axis-aligned rectangle that still fits entirely inside the
+  rotated image. Deliberately conservative: only a clear, small-to-moderate
+  tilt (a shy few degrees off vertical) is corrected; a photo with no
+  confident line, or one that's tilted for deliberate creative effect, is
+  left untouched. Classical computer vision, not a trained model. Runs
+  first in the pipeline, before Auto-Balance Light & Color and the preset;
+  "Show Original" always stays the uncropped source. Wired through
+  `EditSession.auto_level_enabled` and `BatchJob.auto_level_enabled` for
+  both preview and batch export.
+
+### Added (Desktop) — Suggest Composition Crop (AI)
+
+- A new "Suggest Composition Crop (AI, beta)" checkbox (off by default, its
+  own "Composition (suggestion only)" group). Unlike every other checkbox
+  in the panel, this one never touches the rendered or exported photo — it
+  only draws a rule-of-thirds grid and a suggested crop rectangle as an
+  overlay on the preview, for the photographer to act on (or ignore)
+  themselves. Cropping is a creative decision, not a technical correction,
+  so this is designed as a proposal-only feature by request — a step
+  toward the framing conventions judged in international competition
+  entries, without ever silently altering a photo.
+  `color_engine.composition_suggest.suggest_crop()` finds the likely main
+  subject with the same local ONNX face-detection model used by
+  Auto-suggest Film Simulation, falling back to classical visual-saliency
+  detection (`cv2.saliency.StaticSaliencySpectralResidual`, OpenCV-contrib)
+  when no face is found, then scores candidate crops (several scales ×
+  each of the four rule-of-thirds intersection points) by how well the
+  subject lands on a thirds point, preferring the least-aggressive crop
+  among near-equal scores. Fully local/offline — no network call, no
+  per-image cost. Requires `opencv-contrib-python-headless` (switched from
+  the base `opencv-python-headless`, which doesn't ship the `saliency`
+  module).
+- Internal refactor: `face_detector.py` moved from `preset_engine` to
+  `color_engine` (`preset_engine.auto_suggest` now imports it from there)
+  so `composition_suggest` — which lives in `color_engine` — doesn't reach
+  upward into `preset_engine`, keeping the documented
+  GUI → Workflow → Preset Engine → Color Engine → Export Engine layering
+  one-directional. `FaceBox` gained an `x0/y0/x1/y1` bounding box (previously
+  only a confidence score) plus a `detect_primary_face()` entry point.
+
 ### Added (Desktop) — Auto-Balance Light & Color
 
 - A new "Auto-Balance Light & Color (beta)" checkbox (off by default,
@@ -34,6 +83,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   model, no network, no cost) — wired through
   `EditSession.local_balance_enabled` and `BatchJob.local_balance_enabled`
   for both preview and batch export.
+- The same checkbox now also neutralizes an overall color cast first, via
+  gray-world auto white balance (`_auto_white_balance()`): scales each RGB
+  channel so its average roughly matches the other two, capped to a modest
+  gain range so it corrects an obvious cast (warm indoor light, a cool
+  overcast sky) without overcorrecting a scene that's legitimately
+  dominated by one color (a sunset, a forest). Runs before the per-region
+  exposure/saturation correction, on the same source photo.
 
 ### Added (Desktop) — real face detection for auto-suggest
 

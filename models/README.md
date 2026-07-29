@@ -4,12 +4,13 @@
 
 **Ultra-Light-Fast-Generic-Face-Detector-1MB** (`version-RFB-320.onnx`),
 by [Linzaer](https://github.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB),
-MIT License. Used by `myphoto.preset_engine.face_detector` to give
+MIT License. Used by `myphoto.color_engine.face_detector` to give
 `preset_engine.auto_suggest` a real (deep-learning) face-presence signal —
 replacing an earlier hue-range "does this look like skin color" heuristic,
 which had no way to distinguish a real face from any other object that
 happens to share a similar hue/saturation range, and was unreliable across
-different skin tones.
+different skin tones. Also used by `color_engine.composition_suggest` to
+locate the main subject for the composition-crop suggestion feature.
 
 Runs fully offline via `onnxruntime` (CPU) — no network call, no per-image
 cost, no photo ever leaves the device.

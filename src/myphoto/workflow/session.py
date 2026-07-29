@@ -10,6 +10,8 @@ from PySide6.QtCore import QObject, Signal
 
 from myphoto.batch.models import BatchJob
 from myphoto.batch.processor import BatchProcessor
+from myphoto.color_engine.auto_level import apply_auto_level_to_buffer
+from myphoto.color_engine.composition_suggest import suggest_crop
 from myphoto.color_engine.local_adjust import apply_local_balance_to_buffer
 from myphoto.export_engine.models import ExportOptions
 from myphoto.export_engine.writer import ExportEngine
@@ -30,6 +32,10 @@ class EditSession(QObject):
     #: Emitted when auto-suggest picks a different Film Simulation than the
     #: one currently set, so the UI's dropdown can reflect it.
     film_simulation_suggested = Signal(str)
+    #: Emitted after every render_preview() when composition_suggest_enabled
+    #: is set, carrying a CropSuggestion (or None if nothing was found) for
+    #: the preview to draw as a non-destructive overlay.
+    composition_suggested = Signal(object)
     batch_progress = Signal(int, int)
     batch_item_finished = Signal(object)
     batch_finished = Signal(list)
@@ -80,6 +86,16 @@ class EditSession(QObject):
         #: Profile/Film Simulation are applied — never touches the
         #: "Show Original" preview, which always stays the true source.
         self.local_balance_enabled = False
+        #: When enabled, a detected horizon/tilt is straightened (see
+        #: `color_engine.auto_level`) before anything else runs — this can
+        #: crop the image slightly. Never touches "Show Original".
+        self.auto_level_enabled = False
+        #: When enabled, render_preview() computes a suggested composition
+        #: crop (see `color_engine.composition_suggest`) and emits it via
+        #: `composition_suggested` for the preview to draw as an overlay —
+        #: a proposal only, never applied to the actual rendered/exported
+        #: pixels.
+        self.composition_suggest_enabled = False
 
     def list_base_profiles(self) -> list[Preset]:
         return self._preset_loader.list_base_profiles()
@@ -121,7 +137,8 @@ class EditSession(QObject):
         source_path = self.image_paths[self.current_index]
         try:
             original = downscaled(self._image_loader.load(source_path), self.PREVIEW_MAX_DIMENSION)
-            working = apply_local_balance_to_buffer(original) if self.local_balance_enabled else original
+            working = apply_auto_level_to_buffer(original) if self.auto_level_enabled else original
+            working = apply_local_balance_to_buffer(working) if self.local_balance_enabled else working
             if self.auto_suggest_enabled:
                 available_ids = {preset.id for preset in self._preset_loader.list_film_simulations()}
                 suggested_id = suggest_film_simulation_id(working, available_ids)
@@ -139,6 +156,8 @@ class EditSession(QObject):
             self.preview_failed.emit(str(exc))
             return
         self.preview_ready.emit(original, rendered)
+        if self.composition_suggest_enabled:
+            self.composition_suggested.emit(suggest_crop(working))
 
     def export_all(self, export_options: ExportOptions) -> None:
         """Batch-export every imported image at full resolution."""
@@ -150,6 +169,7 @@ class EditSession(QObject):
             export_options=export_options,
             grain_amount=self.grain_amount,
             local_balance_enabled=self.local_balance_enabled,
+            auto_level_enabled=self.auto_level_enabled,
         )
         self._batch_processor.run(job)
 

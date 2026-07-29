@@ -9,7 +9,7 @@ no photo ever leaves the device. It combines two local, offline pieces:
    foliage/sky it usually has, and — via `face_detector.face_confidence`
    — how likely it is to contain a face), matched by normalized Euclidean
    distance (nearest-centroid classifier).
-2. `preset_engine.face_detector`, a small pretrained ONNX face detector
+2. `color_engine.face_detector`, a small pretrained ONNX face detector
    (MIT-licensed, bundled in `models/`) run via `onnxruntime` — this
    replaced an earlier hue-range "does this look like skin color" guess,
    which had no way to tell an actual face apart from any other object
@@ -37,8 +37,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from myphoto.color_engine.adapters.opencv_adapter import OpenCVColorMath
+from myphoto.color_engine.face_detector import face_confidence as _face_confidence
 from myphoto.core.image import ImageBuffer
-from myphoto.preset_engine.face_detector import face_confidence as _face_confidence
 
 #: Used when nothing else scores above zero, or the analysis can't run
 #: (e.g. an empty image) — Provia is the "standard" simulation.

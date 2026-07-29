@@ -55,6 +55,21 @@ def test_oversaturated_region_gets_desaturated() -> None:
     assert chroma(result[:, :32]) < chroma(rgb[:, :32])
 
 
+def test_warm_color_cast_is_neutralized() -> None:
+    # A uniform warm (orange-ish) cast across the whole photo, as if lit by
+    # incandescent bulbs — gray-world should pull the channel means together.
+    rgb = np.full((32, 32, 3), 0.5, dtype=np.float32)
+    rgb[..., 0] = 0.65  # red channel biased high
+    rgb[..., 2] = 0.35  # blue channel biased low
+
+    result = apply_local_balance(rgb, strength=1.0)
+
+    means = result.reshape(-1, 3).mean(axis=0)
+    original_spread = float(rgb.reshape(-1, 3).mean(axis=0).max() - rgb.reshape(-1, 3).mean(axis=0).min())
+    corrected_spread = float(means.max() - means.min())
+    assert corrected_spread < original_spread
+
+
 def test_apply_local_balance_to_buffer_preserves_alpha_and_metadata() -> None:
     data = np.concatenate(
         [_region_image(bright=0.9, dark=0.1), np.full((64, 64, 1), 0.7, dtype=np.float32)], axis=-1

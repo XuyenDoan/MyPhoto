@@ -1,11 +1,20 @@
-"""Local (per-region) exposure and saturation balancing.
+"""Auto white balance, plus local (per-region) exposure and saturation balancing.
+
+White balance technique: the classic "gray-world" assumption — averaged
+over a whole photo, the scene's true colors should roughly cancel out to
+neutral gray, so any consistent per-channel bias in the actual average is
+treated as a color cast (warm indoor lighting, a cool shade cast, ...) and
+scaled back out. This is global (one gain per channel for the whole
+photo), unlike the exposure/saturation steps below — a color cast is
+normally a property of the light source, not of one region of the frame.
 
 Unlike the rest of the Color Pipeline — one global exposure/tone-curve/HSL
-adjustment applied uniformly to the whole image — this looks at *where* a
-photo is over/under-exposed or over-saturated and corrects each region on
-its own. A bright sky and a shaded foreground in the same frame get pulled
-toward balanced exposure independently, instead of one global slider that
-can only compromise between the two.
+adjustment applied uniformly to the whole image — the exposure/saturation
+steps below look at *where* a photo is over/under-exposed or
+over-saturated and correct each region on its own. A bright sky and a
+shaded foreground in the same frame get pulled toward balanced exposure
+independently, instead of one global slider that can only compromise
+between the two.
 
 Exposure technique: blur the luminance channel with a large-radius
 Gaussian to estimate each region's *local* exposure level (the detail/
@@ -40,6 +49,12 @@ import numpy as np
 
 from myphoto.core.image import ImageBuffer
 
+#: Gray-world white balance gain is clamped to this range so a photo that's
+#: legitimately dominated by one color (a sunset, a red wall) doesn't get
+#: forced toward an incorrect neutral gray.
+_MIN_WHITE_BALANCE_GAIN = 0.75
+_MAX_WHITE_BALANCE_GAIN = 1.35
+
 #: Regions whose local luminance sits far from this are nudged toward it.
 _TARGET_LUMINANCE = 0.5
 
@@ -63,6 +78,19 @@ _MIN_LUMINANCE_FOR_GAIN = 0.03
 _MAX_SATURATION_SHIFT = 0.4
 
 
+def _auto_white_balance(rgb: np.ndarray, strength: float) -> np.ndarray:
+    """Gray-world white balance: scale channels so their averages match."""
+    channel_means = rgb.reshape(-1, 3).mean(axis=0)
+    gray_mean = float(channel_means.mean())
+    if gray_mean < 1e-4:
+        return rgb
+    raw_gains = gray_mean / np.maximum(channel_means, 1e-4)
+    gains = 1.0 + (raw_gains - 1.0) * strength
+    gains = np.clip(gains, _MIN_WHITE_BALANCE_GAIN, _MAX_WHITE_BALANCE_GAIN)
+    result: np.ndarray = np.clip(rgb * gains, 0.0, 1.0)
+    return result
+
+
 def apply_local_balance(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
     """Return a corrected copy of ``rgb`` (``(H, W, 3)`` float32, values in ``[0, 1]``).
 
@@ -74,6 +102,7 @@ def apply_local_balance(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
         return no_op
 
     clipped = np.clip(rgb, 0.0, 1.0).astype(np.float32)
+    clipped = _auto_white_balance(clipped, strength)
     sigma = max(rgb.shape[0], rgb.shape[1]) * _BLUR_SIGMA_FRACTION
 
     luminance = clipped[..., 0] * 0.2126 + clipped[..., 1] * 0.7152 + clipped[..., 2] * 0.0722

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (Desktop) — batch export re-entrancy guard
+
+- Found while running a full-app smoke test (every checkbox combination x
+  every Film Simulation x export, driven through the real `MainWindow`):
+  `BatchProcessor.run()` had no guard against being called again before a
+  previous batch finished — doing so replaced `self._active_runnables`
+  out from under the still-in-flight `QRunnable`s, letting PySide6
+  garbage-collect their Python wrappers mid-execution
+  (`Error calling Python override of QRunnable::run()`). Not reachable
+  through the actual UI (the Export button is disabled for the duration
+  of a batch — see `MainWindow._on_export_clicked`/`_on_batch_finished`),
+  but a real latent bug for any other caller. `BatchProcessor.run()` now
+  raises `RuntimeError` if a batch is already running, and clears
+  `_active_runnables` once a batch's `finished` signal fires so a
+  subsequent, non-overlapping `run()` call works normally.
+
 ### Added (Desktop) — Auto-Balance Light & Color now also guards after the preset
 
 - Extends the existing "Auto-Balance Light & Color" checkbox to run a

@@ -124,6 +124,43 @@ def test_empty_job_finishes_immediately(
     assert blocker.args[0] == []
 
 
+def test_run_again_after_previous_batch_finished_succeeds(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine
+) -> None:
+    path = tmp_path / "img.png"
+    _make_image(path)
+    options = ExportOptions(format="jpeg", output_dir=tmp_path / "out")
+    job = BatchJob((path,), "fujifilm", "provia", 1.0, options)
+
+    processor = BatchProcessor(preset_engine)
+    with qtbot.waitSignal(processor.finished, timeout=5000):
+        processor.run(job)
+
+    # A second, independent batch after the first has fully finished must
+    # not be blocked by the re-entrancy guard.
+    with qtbot.waitSignal(processor.finished, timeout=5000) as blocker:
+        processor.run(job)
+
+    assert len(blocker.args[0]) == 1
+
+
+def test_run_while_previous_batch_in_flight_raises(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine
+) -> None:
+    path = tmp_path / "img.png"
+    _make_image(path)
+    options = ExportOptions(format="jpeg", output_dir=tmp_path / "out")
+    job = BatchJob((path,), "fujifilm", "provia", 1.0, options)
+
+    processor = BatchProcessor(preset_engine)
+    processor.run(job)
+    with pytest.raises(RuntimeError):
+        processor.run(job)
+
+    with qtbot.waitSignal(processor.finished, timeout=5000):
+        pass  # drain the first batch so it doesn't leak into other tests
+
+
 def test_cancel_marks_not_yet_started_items_as_cancelled(
     qtbot, tmp_path: Path, preset_engine: PresetEngine
 ) -> None:

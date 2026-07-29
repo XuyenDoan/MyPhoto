@@ -59,7 +59,19 @@ class BatchProcessor(QObject):
         self._active_runnables: list[BatchItemRunnable] = []
 
     def run(self, job: BatchJob) -> None:
-        """Queue every item in ``job`` for background processing."""
+        """Queue every item in ``job`` for background processing.
+
+        Raises ``RuntimeError`` if a previous batch is still in flight:
+        calling ``run()`` again before ``finished`` fires would replace
+        ``self._active_runnables`` out from under the still-running
+        ``QRunnable``s from the first batch, letting PySide6 garbage-collect
+        their Python wrappers mid-execution. The UI already prevents this
+        (the Export button is disabled for the duration of a batch); this
+        guard protects any other caller from the same footgun.
+        """
+        if self._active_runnables:
+            raise RuntimeError("BatchProcessor.run() called while a previous batch is still running")
+
         self._cancel_event = threading.Event()
         self._results = [None] * len(job.source_paths)
         self._active_runnables = []
@@ -93,6 +105,7 @@ class BatchProcessor(QObject):
             self.item_finished.emit(result)
             self.progress.emit(len(completed), len(self._results))
             if len(completed) == len(self._results):
+                self._active_runnables = []
                 self.finished.emit(completed)
 
         return _on_item_finished

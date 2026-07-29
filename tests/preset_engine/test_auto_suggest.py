@@ -42,10 +42,24 @@ def test_skin_tone_dominant_image_suggests_astia() -> None:
 
 def test_high_contrast_desaturated_image_suggests_acros() -> None:
     rgb = np.zeros((32, 32, 3), dtype=np.float32)
-    rgb[::2] = 0.05
-    rgb[1::2] = 0.95
+    rgb[::2] = 0.2
+    rgb[1::2] = 0.8
 
     assert suggest_film_simulation_id(_buffer(rgb), _ALL_IDS) == "acros"
+
+
+def test_ordinary_saturated_outdoor_snapshot_does_not_default_to_velvia() -> None:
+    # A regular sky+ground+building daylight photo — noticeably colorful but
+    # not a punchy landscape shot. The nearest-centroid classifier should
+    # NOT reach for the vivid preset just because saturation is moderately
+    # high somewhere in frame (the failure mode of the old weighted-sum
+    # scorer, which over-picked Velvia for ordinary photos).
+    sky = np.tile(np.array([0.5, 0.65, 0.85], dtype=np.float32), (10, 32, 1))
+    midground = np.tile(np.array([0.55, 0.5, 0.4], dtype=np.float32), (12, 32, 1))
+    grass = np.tile(np.array([0.3, 0.5, 0.25], dtype=np.float32), (10, 32, 1))
+    rgb = np.concatenate([sky, midground, grass], axis=0)
+
+    assert suggest_film_simulation_id(_buffer(rgb), _ALL_IDS) != "velvia"
 
 
 def test_warm_dim_muted_image_suggests_nostalgic_neg() -> None:

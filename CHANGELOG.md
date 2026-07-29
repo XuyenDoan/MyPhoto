@@ -21,6 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   fully offline, and always overridable (unchecking it hands the dropdown
   back to manual control).
 
+### Fixed (Desktop) — auto-suggest over-picking Velvia
+
+- The first version of `auto_suggest` scored each preset as a weighted sum
+  of independent signals, which let one strong signal (overall saturation)
+  dominate — ordinary colorful daylight photos kept getting matched to
+  Velvia (vivid) even without a real landscape/nature scene behind it,
+  making auto-suggested photos look oversaturated. Replaced the scorer
+  with a nearest-centroid classifier: each preset has a 6-dimension
+  "typical photo" feature vector (warmth, brightness, contrast,
+  saturation, skin-tone ratio, foliage/sky ratio), and the loaded photo's
+  measured vector is matched to whichever centroid is closest overall —
+  a photo only lands on Velvia when it's genuinely landscape-like *and*
+  vivid together, not from one dominant feature alone. Provia's centroid
+  sits at roughly typical values, so ordinary/ambiguous photos land on it
+  by default instead of a more stylized preset.
+
 ### Fixed (Desktop)
 
 - `ImageLoader` didn't apply EXIF orientation when decoding JPEG/TIFF —

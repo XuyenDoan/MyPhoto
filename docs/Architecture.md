@@ -144,15 +144,21 @@ without changing how strongly the rest of the look is applied.
 ### Auto-suggest Film Simulation
 
 `preset_engine.auto_suggest.suggest_film_simulation_id()` is a
-deterministic, rule-based heuristic — not a trained ML model, no bundled
-weights, nothing sent over the network. It computes simple statistics from
-the loaded image (mean warmth, brightness, contrast, mean saturation, and
-the fraction of pixels that fall in typical skin-tone/foliage/sky hue
-ranges, via `OpenCVColorMath.rgb_to_hls`) and scores each shipped Film
-Simulation against the scenario it's meant to flatter (e.g. Velvia for
-saturated nature shots, Astia for portraits, Acros for high-contrast
-desaturated scenes), returning the highest-scoring one that's actually
-available. `EditSession.auto_suggest_enabled` (off by default) gates
+deterministic nearest-centroid classifier — not a trained ML model, no
+bundled weights, nothing sent over the network. It computes simple
+statistics from the loaded image (warmth, brightness, contrast, mean
+saturation, and the fraction of pixels that fall in typical skin-tone or
+foliage/sky hue ranges, via `OpenCVColorMath.rgb_to_hls`), then finds
+whichever shipped Film Simulation's hand-authored "typical photo" feature
+vector is closest (normalized Euclidean distance across all 6 features at
+once). Distance-based matching deliberately avoids the failure mode of a
+simple weighted-sum score, where one dominant signal (e.g. overall
+saturation) could push a vivid preset to the top for almost any colorful
+photo — a photo only matches Velvia when it's close to *both* landscape
+content and real vividness simultaneously, not from one strong feature
+alone. Provia's centroid sits at roughly typical photo values, so
+ambiguous/ordinary photos land on it by default. `EditSession.auto_suggest_enabled`
+(off by default) gates
 whether `render_preview()` calls it; when it changes `film_simulation_id`,
 `film_simulation_suggested(str)` fires so `ControlsPanel` can move its
 dropdown to match. This is a fast, offline, always-overridable starting

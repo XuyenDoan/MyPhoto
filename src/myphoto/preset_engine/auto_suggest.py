@@ -1,13 +1,25 @@
 """Heuristic (non-ML) Film Simulation suggestion based on image statistics.
 
 This is *not* a trained model — no machine learning, no bundled weights,
-nothing sent over the network. It's a small set of deterministic rules over
-simple color statistics (overall warmth, brightness, contrast, saturation,
-and the fraction of pixels that look like skin tones / greenery / sky) that
-map a photo's rough "scenario" to whichever shipped Film Simulation usually
-suits it. It's meant as a fast starting point the user can always override,
-not a claim of being "correct" — a proper learned scene classifier is a
-much bigger project (see docs/Architecture.md).
+nothing sent over the network. It's a nearest-centroid classifier: each
+Film Simulation has a hand-authored "typical photo" feature vector (how
+warm/bright/contrasty/saturated a photo suits it, plus how much skin tone
+or foliage/sky it usually has), and the loaded photo's own measured
+statistics are matched to whichever centroid is closest (normalized
+Euclidean distance across every feature at once).
+
+Why nearest-centroid rather than a simple weighted-sum-of-signals score
+(this module's first version): a weighted sum lets one strong signal (e.g.
+high overall saturation) dominate and push a vivid preset to the top for
+almost any colorful photo, regardless of how well the *rest* of the photo's
+character actually matches that preset's scenario. Distance-to-centroid
+requires the photo to be close across every dimension at once, so a photo
+only gets matched to Velvia when it's genuinely landscape-like *and*
+vivid together — not just "somewhat saturated somewhere in the frame".
+
+Provia's centroid sits at roughly the population-typical values, so
+ordinary/ambiguous photos land on it (the "standard" simulation) rather
+than on a more stylized preset by default.
 """
 
 from __future__ import annotations
@@ -35,25 +47,58 @@ class _SceneStats:
     contrast: float  # std of HLS lightness, 0..1
     mean_saturation: float  # mean HLS saturation, 0..1
     skin_ratio: float  # fraction of pixels in a typical skin-tone range
-    green_ratio: float  # fraction of pixels in a typical foliage hue range
-    sky_ratio: float  # fraction of pixels in a typical sky hue range
+    nature_ratio: float  # fraction of pixels in typical foliage/sky hue ranges
+
+
+#: (warmth, brightness, contrast, saturation, skin_ratio, nature_ratio) —
+#: hand-authored "typical photo" centroid for each shipped Film Simulation.
+_CENTROIDS: dict[str, tuple[float, float, float, float, float, float]] = {
+    "provia": (0.00, 0.50, 0.18, 0.35, 0.05, 0.10),
+    "velvia": (0.02, 0.50, 0.22, 0.60, 0.00, 0.55),
+    "astia": (0.03, 0.55, 0.15, 0.40, 0.60, 0.05),
+    "pro_neg_hi": (0.02, 0.50, 0.22, 0.35, 0.50, 0.05),
+    "pro_neg_std": (0.02, 0.50, 0.14, 0.30, 0.50, 0.05),
+    "reala_ace": (0.00, 0.50, 0.20, 0.45, 0.10, 0.30),
+    "classic_chrome": (-0.03, 0.45, 0.16, 0.28, 0.10, 0.15),
+    "classic_neg": (-0.05, 0.45, 0.18, 0.30, 0.15, 0.10),
+    "eterna": (-0.02, 0.45, 0.12, 0.25, 0.10, 0.15),
+    "eterna_bleach_bypass": (0.00, 0.45, 0.30, 0.15, 0.05, 0.10),
+    "acros": (0.00, 0.50, 0.28, 0.05, 0.05, 0.10),
+    "sepia": (0.10, 0.40, 0.20, 0.05, 0.10, 0.10),
+    "nostalgic_neg": (0.12, 0.32, 0.16, 0.30, 0.20, 0.10),
+}
+
+#: Per-feature normalization divisor, roughly each feature's typical spread
+#: across real photos — keeps one high-range feature (e.g. saturation)
+#: from dominating the distance just because its raw numbers are bigger.
+_FEATURE_SCALE = (0.15, 0.30, 0.15, 0.30, 0.50, 0.50)
 
 
 def suggest_film_simulation_id(buffer: ImageBuffer, available_ids: set[str]) -> str:
-    """Return the id of the best-matching Film Simulation preset for ``buffer``.
+    """Return the id of the closest-matching Film Simulation preset for ``buffer``.
 
     ``available_ids`` is whatever the caller's :class:`~myphoto.preset_engine.loader.PresetLoader`
-    actually has loaded — a scored id that isn't shipped (e.g. a future
-    preset this heuristic doesn't know about yet) is simply skipped.
+    actually has loaded — a preset this heuristic knows about but that isn't
+    shipped is simply skipped.
     """
     if buffer.data.size == 0 or not available_ids:
         return FALLBACK_PRESET_ID if FALLBACK_PRESET_ID in available_ids else next(iter(available_ids), FALLBACK_PRESET_ID)
 
     stats = _analyze(buffer)
-    for preset_id, _score in sorted(_scores(stats).items(), key=lambda item: item[1], reverse=True):
+    vector = (stats.warmth, stats.brightness, stats.contrast, stats.mean_saturation, stats.skin_ratio, stats.nature_ratio)
+
+    ranked = sorted(_CENTROIDS.items(), key=lambda item: _distance(vector, item[1]))
+    for preset_id, _centroid in ranked:
         if preset_id in available_ids:
             return preset_id
     return next(iter(available_ids), FALLBACK_PRESET_ID)
+
+
+def _distance(
+    vector: tuple[float, float, float, float, float, float],
+    centroid: tuple[float, float, float, float, float, float],
+) -> float:
+    return sum(((v - c) / scale) ** 2 for v, c, scale in zip(vector, centroid, _FEATURE_SCALE, strict=True))
 
 
 def _analyze(buffer: ImageBuffer) -> _SceneStats:
@@ -86,35 +131,5 @@ def _analyze(buffer: ImageBuffer) -> _SceneStats:
         contrast=contrast,
         mean_saturation=mean_saturation,
         skin_ratio=float(skin_mask.mean()),
-        green_ratio=float(green_mask.mean()),
-        sky_ratio=float(sky_mask.mean()),
+        nature_ratio=float((green_mask | sky_mask).mean()),
     )
-
-
-def _scores(stats: _SceneStats) -> dict[str, float]:
-    """Score every shipped Film Simulation for how well it fits ``stats``.
-
-    Each rule targets the scenario that preset is designed to flatter, e.g.
-    Velvia for saturated nature/landscape shots, Astia for portraits. The
-    exact weights are hand-tuned, not fit to data — treat this as "a
-    reasonable guess", not ground truth.
-    """
-    nature_ratio = stats.green_ratio + stats.sky_ratio
-    vividness = max(0.0, stats.mean_saturation - 0.3)
-    mutedness = max(0.0, 0.4 - stats.mean_saturation)
-
-    return {
-        "astia": stats.skin_ratio * 3.0,
-        "pro_neg_hi": stats.skin_ratio * 2.0 if stats.contrast >= 0.18 else stats.skin_ratio * 0.5,
-        "pro_neg_std": stats.skin_ratio * 2.0 if stats.contrast < 0.18 else stats.skin_ratio * 0.5,
-        "velvia": nature_ratio * 2.0 + vividness * 2.0,
-        "reala_ace": vividness * 1.5 if stats.skin_ratio < 0.15 else vividness * 0.3,
-        "acros": mutedness * 2.0 if stats.contrast > 0.2 else 0.0,
-        "sepia": mutedness * 1.5 if stats.warmth > 0.02 else 0.0,
-        "nostalgic_neg": stats.warmth * 2.0 if stats.brightness < 0.45 else 0.0,
-        "classic_neg": mutedness * 1.5 if stats.warmth < 0 else mutedness * 0.5,
-        "eterna_bleach_bypass": mutedness * 1.0 if stats.contrast > 0.25 else 0.0,
-        "eterna": mutedness * 1.2 if stats.contrast <= 0.25 else 0.0,
-        "classic_chrome": mutedness * 1.2,
-        "provia": 0.2,  # small, always-present baseline so something always wins
-    }

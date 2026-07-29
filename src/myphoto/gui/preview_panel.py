@@ -42,7 +42,7 @@ class PreviewPanel(QWidget):
         #: color_engine.composition_suggest.
         self._composition_suggestion: CropSuggestion | None = None
 
-        self._show_original_checkbox = QCheckBox("Show Original (Before)", self)
+        self._show_original_checkbox = QCheckBox("Hiện Ảnh Gốc (Trước)", self)
         self._show_original_checkbox.toggled.connect(self._update_display)
 
         self._image_label = QLabel(self)

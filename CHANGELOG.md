@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed (Desktop) — UI translated to Vietnamese
+
+- Every user-facing string in the desktop GUI (checkbox labels, tooltips,
+  group box titles, form row labels, buttons, status-bar/dialog messages)
+  is now in Vietnamese — the app's target audience. The `MyPhoto` app
+  name/window title stays as-is (a brand name). Fixed a real Qt gotcha
+  along the way: a literal `&` in a `QCheckBox` label ("Cân Bằng Sáng &
+  Màu") is normally consumed as a keyboard-mnemonic marker rather than
+  displayed — it rendered as "Sáng _Màu" with the letter dropped. Escaped
+  as `&&` (Qt's literal-ampersand syntax) to display correctly.
+
+### Verified (Desktop) — exported photos keep their detail; presets re-checked
+
+- Tested whether the export pipeline (now including Fix Chromatic
+  Aberration and Auto Sharpen) loses detail, using a realistically
+  textured synthetic photo (layered fractal noise for grass/gravel-like
+  texture, not flat color blocks) run through the full auto pipeline and
+  written to an actual JPEG file on disk (a real compression round-trip,
+  not just an in-memory buffer). Detail (Laplacian variance and
+  high-frequency FFT energy) came out *higher* than the source at both
+  quality 95 and 85, and closely matched a lossless PNG export of the
+  same render — confirming Auto Sharpen more than compensates for any
+  softening from other corrections, and JPEG compression at the default
+  quality doesn't meaningfully cost detail. Repeated across a vivid
+  preset (Velvia), a desaturated one (Eterna Bleach Bypass), and a
+  monochrome one (Acros): all ended up above the source's detail level.
+- Re-ran the preset-recipe-direction and 9-criterion tests (see the
+  "Extend Auto-Balance..." entry below) with Fix Chromatic Aberration and
+  Auto Sharpen now included in the pipeline: results are unchanged
+  (10/13 direction matches, ~95.1% average criteria pass rate) — the two
+  new features don't alter how the Film Simulation presets render.
+
 ### Added (Desktop) — Fix Chromatic Aberration, Auto Sharpen
 
 - Two new "Smart Correction" checkboxes (both off by default), added to

@@ -56,9 +56,9 @@ class MainWindow(QMainWindow):
         # before the user has opted in.
         self._session.grain_amount = self._controls_panel.effective_grain_amount()
 
-        self._export_button = QPushButton("Export", self)
+        self._export_button = QPushButton("Xuất Ảnh", self)
         self._export_button.setObjectName("primaryButton")
-        self._cancel_button = QPushButton("Cancel", self)
+        self._cancel_button = QPushButton("Hủy", self)
         self._cancel_button.setEnabled(False)
         self._progress_bar = QProgressBar(self)
         self._progress_bar.setRange(0, 1)
@@ -209,15 +209,15 @@ class MainWindow(QMainWindow):
         self.statusBar().clearMessage()
 
     def _on_preview_failed(self, message: str) -> None:
-        self.statusBar().showMessage(f"Preview failed: {message}", 5000)
+        self.statusBar().showMessage(f"Xem trước lỗi: {message}", 5000)
 
     def _on_export_clicked(self) -> None:
         if not self._session.image_paths:
-            QMessageBox.information(self, "MyPhoto", "Add some images first.")
+            QMessageBox.information(self, "MyPhoto", "Vui lòng thêm ảnh trước.")
             return
         options = self._controls_panel.export_options()
         if not str(options.output_dir):
-            QMessageBox.information(self, "MyPhoto", "Choose an export folder first.")
+            QMessageBox.information(self, "MyPhoto", "Vui lòng chọn thư mục xuất ảnh trước.")
             return
 
         self._export_button.setEnabled(False)
@@ -246,7 +246,7 @@ class MainWindow(QMainWindow):
         failed = [result for result in results if not result.succeeded]
         if failed:
             self.statusBar().showMessage(
-                f"Export finished: {len(results) - len(failed)}/{len(results)} succeeded", 8000
+                f"Xuất ảnh hoàn tất: {len(results) - len(failed)}/{len(results)} thành công", 8000
             )
         else:
-            self.statusBar().showMessage(f"Export finished: {len(results)} image(s)", 5000)
+            self.statusBar().showMessage(f"Xuất ảnh hoàn tất: {len(results)} ảnh", 5000)

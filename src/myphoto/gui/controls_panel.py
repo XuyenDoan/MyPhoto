@@ -51,17 +51,16 @@ class ControlsPanel(QWidget):
         # (as a safety net against clipping the preset's own tone curve/LUT
         # can reintroduce) — see color_engine.local_adjust. Deterministic
         # image processing, not a trained model.
-        self._local_balance_checkbox = QCheckBox("Auto-Balance Light & Color (beta)", self)
+        self._local_balance_checkbox = QCheckBox("Tự Động Cân Bằng Sáng && Màu (beta)", self)
         self._local_balance_checkbox.setChecked(False)
         self._local_balance_checkbox.setToolTip(
-            "Corrects each region of the photo on its own: dims blown-out "
-            "highlights, lifts overly dark shadows, and tames patches of "
-            "extreme saturation — instead of one global slider that "
-            "compromises across the whole image. Runs before the preset, "
-            "on the source photo, and once more, gently, after the preset "
-            "to catch clipping the preset's own tone curve or color LUT "
-            "can reintroduce. Deterministic image processing, not a "
-            "trained model."
+            "Tự động chỉnh từng vùng của ảnh riêng biệt: giảm sáng vùng bị "
+            "cháy sáng, tăng sáng vùng quá tối, và giảm bớt các mảng màu "
+            "quá bão hòa — thay vì dùng một thanh trượt chung ảnh hưởng "
+            "toàn bộ ảnh. Chạy trước khi áp preset màu (trên ảnh gốc), và "
+            "chạy nhẹ thêm một lần nữa sau khi áp preset để khắc phục hiện "
+            "tượng cháy sáng/cháy màu mà chính preset có thể gây ra. Xử lý "
+            "ảnh theo thuật toán, không dùng AI."
         )
         self._local_balance_checkbox.toggled.connect(self.local_balance_toggled.emit)
 
@@ -69,14 +68,14 @@ class ControlsPanel(QWidget):
         # to level it leaves corner gaps that must be cropped out) — see
         # color_engine.auto_level. Classical edge/line detection, not a
         # trained model.
-        self._auto_level_checkbox = QCheckBox("Auto-Level Horizon (beta)", self)
+        self._auto_level_checkbox = QCheckBox("Tự Động Làm Thẳng Chân Trời (beta)", self)
         self._auto_level_checkbox.setChecked(False)
         self._auto_level_checkbox.setToolTip(
-            "Detects a tilted horizon or other dominant straight line and "
-            "rotates the photo to level it. Rotating necessarily crops a "
-            "small amount off each edge. Only acts on a clear, correctable "
-            "tilt — a deliberately dramatic angled shot, or a photo with no "
-            "confident line, is left untouched."
+            "Phát hiện chân trời bị nghiêng (hoặc đường thẳng chủ đạo khác) "
+            "và xoay ảnh để làm thẳng lại. Việc xoay ảnh sẽ cắt bớt một "
+            "phần nhỏ ở mỗi cạnh. Chỉ tác động khi phát hiện độ nghiêng rõ "
+            "ràng, có thể sửa được — ảnh chụp nghiêng có chủ đích hoặc "
+            "không tìm thấy đường thẳng rõ ràng sẽ được giữ nguyên."
         )
         self._auto_level_checkbox.toggled.connect(self.auto_level_toggled.emit)
 
@@ -84,14 +83,15 @@ class ControlsPanel(QWidget):
         # not a creative correction — see color_engine.chromatic_aberration.
         # Classical edge detection + color-based defringing, not a trained
         # model.
-        self._chromatic_aberration_checkbox = QCheckBox("Fix Chromatic Aberration (beta)", self)
+        self._chromatic_aberration_checkbox = QCheckBox("Khử Viền Màu / Quang Sai (beta)", self)
         self._chromatic_aberration_checkbox.setChecked(False)
         self._chromatic_aberration_checkbox.setToolTip(
-            "Removes the thin purple/green fringe that shows up along "
-            "strong-contrast edges (a lens defect, worse toward the frame's "
-            "edges) — a dark branch against a bright sky is the classic "
-            "case. Only acts right at strong edges, so a genuinely purple "
-            "or green subject away from an edge is never touched."
+            "Khử viền màu tím/xanh mỏng xuất hiện dọc theo các cạnh tương "
+            "phản mạnh (lỗi quang học của ống kính, thường nặng hơn ở rìa "
+            "ảnh) — ví dụ điển hình là cành cây tối trên nền trời sáng. "
+            "Chỉ tác động ngay tại các cạnh tương phản mạnh, nên chủ thể có "
+            "màu tím/xanh thật ở vùng không phải cạnh sẽ không bị ảnh "
+            "hưởng."
         )
         self._chromatic_aberration_checkbox.toggled.connect(
             self.fix_chromatic_aberration_toggled.emit
@@ -100,18 +100,17 @@ class ControlsPanel(QWidget):
         # Off by default. Runs last, after the preset and its grain — see
         # color_engine.sharpen. Deterministic image processing (unsharp
         # masking with a noise threshold), not a trained model.
-        self._auto_sharpen_checkbox = QCheckBox("Auto Sharpen (beta)", self)
+        self._auto_sharpen_checkbox = QCheckBox("Tự Động Làm Nét (beta)", self)
         self._auto_sharpen_checkbox.setChecked(False)
         self._auto_sharpen_checkbox.setToolTip(
-            "Applies a mild capture-sharpening pass to the finished photo. "
-            "A noise threshold means low-amplitude detail — sensor noise, "
-            "a preset's own film grain — isn't amplified along with real "
-            "edges, so this sharpens without making a grainy photo look "
-            "noisier."
+            "Áp dụng một lớp làm nét nhẹ cho ảnh sau khi xử lý xong. Nhờ có "
+            "ngưỡng lọc nhiễu, các chi tiết biên độ thấp (nhiễu cảm biến, "
+            "hạt phim của preset) sẽ không bị khuếch đại theo cạnh thật, "
+            "nên ảnh được làm nét mà không bị nhiễu/hạt nhiều hơn."
         )
         self._auto_sharpen_checkbox.toggled.connect(self.auto_sharpen_toggled.emit)
 
-        correction_group = QGroupBox("Smart Correction", self)
+        correction_group = QGroupBox("Hiệu Chỉnh Thông Minh", self)
         correction_form = QFormLayout(correction_group)
         correction_form.addRow(self._local_balance_checkbox)
         correction_form.addRow(self._auto_level_checkbox)
@@ -125,18 +124,18 @@ class ControlsPanel(QWidget):
         # same face detector as Auto-suggest, falling back to classical
         # saliency detection when no face is found — see
         # color_engine.composition_suggest.
-        self._composition_suggest_checkbox = QCheckBox("Suggest Composition Crop (AI, beta)", self)
+        self._composition_suggest_checkbox = QCheckBox("Gợi Ý Bố Cục Cắt Ảnh (AI, beta)", self)
         self._composition_suggest_checkbox.setChecked(False)
         self._composition_suggest_checkbox.setToolTip(
-            "Draws a rule-of-thirds grid and a suggested crop as a guide "
-            "over the preview — a proposal only, never applied to the "
-            "exported photo. Finds the main subject via a small face-"
-            "detection model, falling back to general visual-saliency "
-            "detection when no face is found."
+            "Vẽ lưới bố cục 1/3 và khung crop gợi ý lên ảnh xem trước — "
+            "chỉ là gợi ý, không bao giờ tự động áp dụng lên ảnh xuất ra. "
+            "Xác định chủ thể chính bằng mô hình nhận diện khuôn mặt nhỏ, "
+            "nếu không thấy khuôn mặt sẽ chuyển sang phát hiện vùng nổi "
+            "bật (saliency) của ảnh."
         )
         self._composition_suggest_checkbox.toggled.connect(self.composition_suggest_toggled.emit)
 
-        composition_group = QGroupBox("Composition (suggestion only)", self)
+        composition_group = QGroupBox("Bố Cục (chỉ gợi ý)", self)
         composition_form = QFormLayout(composition_group)
         composition_form.addRow(self._composition_suggest_checkbox)
 
@@ -151,12 +150,12 @@ class ControlsPanel(QWidget):
         # Off by default: manual preset selection stays the norm. This is a
         # heuristic (color statistics), not a trained model — see
         # preset_engine.auto_suggest.
-        self._auto_suggest_checkbox = QCheckBox("Auto-suggest Film Simulation (beta)", self)
+        self._auto_suggest_checkbox = QCheckBox("Tự Động Gợi Ý Mô Phỏng Phim (beta)", self)
         self._auto_suggest_checkbox.setChecked(False)
         self._auto_suggest_checkbox.setToolTip(
-            "Picks a Film Simulation from the photo's color statistics "
-            "(warmth, saturation, contrast, skin/foliage/sky content) — "
-            "not AI/machine learning, just a fast starting guess."
+            "Chọn Mô Phỏng Phim dựa trên thống kê màu sắc của ảnh (độ ấm, "
+            "độ bão hòa, độ tương phản, tỉ lệ da/cây lá/bầu trời) — không "
+            "phải AI/machine learning, chỉ là một gợi ý khởi điểm nhanh."
         )
         self._auto_suggest_checkbox.toggled.connect(self._on_auto_suggest_toggled)
 
@@ -167,7 +166,7 @@ class ControlsPanel(QWidget):
 
         # Grain is off by default: a preset's own grain amount only applies
         # once the user explicitly opts in via this checkbox.
-        self._grain_checkbox = QCheckBox("Add Film Grain", self)
+        self._grain_checkbox = QCheckBox("Thêm Hạt Phim", self)
         self._grain_checkbox.setChecked(False)
         self._grain_checkbox.toggled.connect(self._on_grain_checkbox_toggled)
 
@@ -175,14 +174,14 @@ class ControlsPanel(QWidget):
         self._grain_slider.setEnabled(False)
         self._grain_slider.valueChanged.connect(self._emit_grain_settings_changed)
 
-        preset_group = QGroupBox("Film Simulation", self)
+        preset_group = QGroupBox("Mô Phỏng Phim", self)
         preset_form = QFormLayout(preset_group)
-        preset_form.addRow("Base Profile", self._base_profile_combo)
-        preset_form.addRow("Film Simulation", self._film_simulation_combo)
+        preset_form.addRow("Máy ảnh gốc", self._base_profile_combo)
+        preset_form.addRow("Mô phỏng phim", self._film_simulation_combo)
         preset_form.addRow(self._auto_suggest_checkbox)
-        preset_form.addRow("Strength", self._strength_slider)
+        preset_form.addRow("Cường độ", self._strength_slider)
         preset_form.addRow(self._grain_checkbox)
-        preset_form.addRow("Film Grain", self._grain_slider)
+        preset_form.addRow("Độ hạt phim", self._grain_slider)
 
         self._format_combo = QComboBox(self)
         self._format_combo.addItems(_EXPORT_FORMATS)
@@ -192,21 +191,21 @@ class ControlsPanel(QWidget):
         self._quality_spin.setValue(95)
 
         self._output_dir_edit = QLineEdit(self)
-        browse_button = QPushButton("Browse...", self)
+        browse_button = QPushButton("Chọn...", self)
         browse_button.clicked.connect(self._browse_output_dir)
 
         naming_note = QLabel(
-            f'Exported files are saved as "&lt;name&gt;{EXPORT_SUFFIX}" — the original is never overwritten.',
+            f'Ảnh xuất ra được lưu với tên "&lt;tên&gt;{EXPORT_SUFFIX}" — ảnh gốc không bao giờ bị ghi đè.',
             self,
         )
         naming_note.setObjectName("hintLabel")
         naming_note.setWordWrap(True)
 
-        export_group = QGroupBox("Export", self)
+        export_group = QGroupBox("Xuất Ảnh", self)
         export_form = QFormLayout(export_group)
-        export_form.addRow("Format", self._format_combo)
-        export_form.addRow("Quality", self._quality_spin)
-        export_form.addRow("Output Folder", self._output_dir_edit)
+        export_form.addRow("Định dạng", self._format_combo)
+        export_form.addRow("Chất lượng", self._quality_spin)
+        export_form.addRow("Thư mục xuất", self._output_dir_edit)
         export_form.addRow("", browse_button)
         export_form.addRow(naming_note)
 
@@ -301,6 +300,6 @@ class ControlsPanel(QWidget):
         self.grain_settings_changed.emit(self.effective_grain_amount())
 
     def _browse_output_dir(self) -> None:
-        directory = QFileDialog.getExistingDirectory(self, "Choose Export Folder")
+        directory = QFileDialog.getExistingDirectory(self, "Chọn Thư Mục Xuất Ảnh")
         if directory:
             self.set_output_dir(Path(directory))

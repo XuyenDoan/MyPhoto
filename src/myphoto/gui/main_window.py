@@ -106,9 +106,13 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._preview_panel)
         splitter.addWidget(self._controls_panel)
         splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 4)
-        splitter.setStretchFactor(2, 2)
+        splitter.setStretchFactor(1, 3)
+        splitter.setStretchFactor(2, 3)
         splitter.setHandleWidth(2)
+        # Give the controls panel a sane minimum width so its two-column
+        # correction group and form labels never get squeezed illegibly
+        # narrow when the splitter is dragged or the window is resized down.
+        self._controls_panel.setMinimumWidth(320)
 
         bottom_bar = QWidget(self)
         bottom_layout = QHBoxLayout(bottom_bar)

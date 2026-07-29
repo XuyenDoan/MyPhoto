@@ -503,13 +503,20 @@ pipeline time on a 12MP test photo went from the original ~136s to ~27s.
   default (preserving the photo's own aspect ratio, so portrait photos
   render tall and landscape photos render wide, instead of a fixed-shape
   crop), with Ctrl+wheel zooming further in/out from that fitted baseline.
-- `ControlsPanel` (right) — a "Smart Correction" group with the
-  Auto-Balance Light & Color checkbox (off by default), then a "Film
-  Simulation" group: Base Profile / Film Simulation dropdowns (populated
-  from `PresetLoader`), an Auto-suggest Film Simulation checkbox (off by
-  default; disables the dropdown while on), a Strength slider, a Film
-  Grain checkbox (off by default) + amount slider, and the export
-  destination fields (format, quality, output folder).
+- `ControlsPanel` (right) — a "Smart Correction" group (its 4 checkboxes
+  laid out as a 2-column grid rather than one long column, to reduce
+  vertical space) with the Auto-Balance Light & Color checkbox (off by
+  default), then a "Film Simulation" group: Base Profile / Film Simulation
+  dropdowns (populated from `PresetLoader`), an Auto-suggest Film
+  Simulation checkbox (off by default; disables the dropdown while on), a
+  Strength slider, a Film Grain checkbox (off by default) + amount slider,
+  and the export destination fields (format, quality, output folder). The
+  whole panel's content sits inside a `QScrollArea`
+  (`setWidgetResizable(True)`) — without it, a panel shorter than its
+  content's natural height had no fallback and Qt compressed/overlapped
+  every row instead of scrolling. The splitter also gives this panel a
+  320px minimum width and a stretch factor equal to the preview panel's
+  (previously the preview panel got roughly twice this panel's share).
 - A bottom bar — progress bar, Cancel, and Export buttons.
 - `myphoto.gui.theme` applies a dark Fusion palette + QSS stylesheet
   application-wide (accent color, styled group boxes/buttons/sliders/

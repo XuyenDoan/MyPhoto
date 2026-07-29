@@ -10,10 +10,12 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSlider,
     QSpinBox,
     QVBoxLayout,
@@ -114,13 +116,20 @@ class ControlsPanel(QWidget):
         )
         self._auto_sharpen_checkbox.toggled.connect(self.auto_sharpen_toggled.emit)
 
+        # Two columns instead of one long vertical stack: with 4 checkboxes
+        # this halves the height the group needs, which is what actually
+        # ran out under a short window/panel (see the QScrollArea note on
+        # the outer layout below for the other half of that fix).
         correction_group = QGroupBox("Hiệu Chỉnh Thông Minh", self)
-        correction_form = QFormLayout(correction_group)
-        correction_form.setVerticalSpacing(10)
-        correction_form.addRow(self._local_balance_checkbox)
-        correction_form.addRow(self._auto_level_checkbox)
-        correction_form.addRow(self._chromatic_aberration_checkbox)
-        correction_form.addRow(self._auto_sharpen_checkbox)
+        correction_grid = QGridLayout(correction_group)
+        correction_grid.setVerticalSpacing(12)
+        correction_grid.setHorizontalSpacing(16)
+        correction_grid.addWidget(self._local_balance_checkbox, 0, 0)
+        correction_grid.addWidget(self._auto_level_checkbox, 0, 1)
+        correction_grid.addWidget(self._chromatic_aberration_checkbox, 1, 0)
+        correction_grid.addWidget(self._auto_sharpen_checkbox, 1, 1)
+        correction_grid.setColumnStretch(0, 1)
+        correction_grid.setColumnStretch(1, 1)
 
         # Off by default. Unlike everything else in this panel, this never
         # touches the rendered/exported photo — it only draws a rule-of-
@@ -217,13 +226,31 @@ class ControlsPanel(QWidget):
         export_form.addRow("", browse_button)
         export_form.addRow(naming_note)
 
+        content = QWidget(self)
+        content_layout = QVBoxLayout(content)
+        content_layout.setSpacing(14)
+        content_layout.addWidget(correction_group)
+        content_layout.addWidget(composition_group)
+        content_layout.addWidget(preset_group)
+        content_layout.addWidget(export_group)
+        content_layout.addStretch(1)
+
+        # A QScrollArea (not just generous spacing) is the only way to
+        # *guarantee* rows never overlap/squish: without one, whenever the
+        # window (or a splitter drag) makes this panel shorter than the
+        # content's natural height, Qt has no fallback and compresses every
+        # row instead — which is what produced the squished comboboxes and
+        # near-invisible "Add Film Grain" row reported against the previous
+        # layout.
+        scroll_area = QScrollArea(self)
+        scroll_area.setWidget(content)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         layout = QVBoxLayout(self)
-        layout.setSpacing(14)
-        layout.addWidget(correction_group)
-        layout.addWidget(composition_group)
-        layout.addWidget(preset_group)
-        layout.addWidget(export_group)
-        layout.addStretch(1)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(scroll_area)
 
     @staticmethod
     def _percent_slider(default: int) -> QSlider:

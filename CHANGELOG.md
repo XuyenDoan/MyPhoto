@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (Desktop) — controls panel rows could overlap/squish on a short window
+
+- The right-hand controls panel (`ControlsPanel`) had no `QScrollArea`:
+  when the window (or a splitter drag) made the panel shorter than the
+  natural height of its four `QGroupBox` sections, Qt had no fallback and
+  compressed every row instead of scrolling — reported by the user as
+  labels staying intact but adjacent comboboxes/sliders squished to
+  near-zero height, and the "Add Film Grain" checkbox row looking faded.
+  Fixed by wrapping the panel's content in a `QScrollArea`
+  (`setWidgetResizable(True)`), which guarantees every row keeps its full
+  natural height regardless of how short the panel gets — verified with
+  offscreen screenshots at 900px, 500px, and 320px window heights: down to
+  320px (the panel now shows barely two groups) nothing overlaps or
+  squishes, it simply scrolls.
+- Also reorganized the "Smart Correction" group's 4 checkboxes from a
+  single vertical column into a 2-column grid (`QGridLayout`), halving
+  that group's required height, and widened the controls panel relative
+  to the preview panel (`QSplitter` stretch factors changed from `1:4:2`
+  to `1:3:3` for image-list:preview:controls, plus a 320px minimum width
+  on the controls panel) so the wider checkbox labels and per-row controls
+  have enough horizontal room — per the user's own suggested layout
+  (fewer columns of preview, more width for corrections).
+
 ### Fixed (Desktop) — batch export could over-subscribe threads/RAM on multi-core machines
 
 - Full-source review requested after the previous export performance

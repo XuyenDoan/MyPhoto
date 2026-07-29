@@ -2,7 +2,12 @@ from pathlib import Path
 
 import numpy as np
 
-from myphoto.color_engine.local_adjust import apply_local_balance, apply_local_balance_to_buffer
+from myphoto.color_engine.local_adjust import (
+    apply_local_balance,
+    apply_local_balance_to_buffer,
+    apply_saturation_guard,
+    apply_saturation_guard_to_buffer,
+)
 from myphoto.core.image import ImageBuffer
 
 
@@ -68,6 +73,50 @@ def test_warm_color_cast_is_neutralized() -> None:
     original_spread = float(rgb.reshape(-1, 3).mean(axis=0).max() - rgb.reshape(-1, 3).mean(axis=0).min())
     corrected_spread = float(means.max() - means.min())
     assert corrected_spread < original_spread
+
+
+def test_saturation_guard_pulls_down_blown_chroma() -> None:
+    size = 64
+    rgb = np.zeros((size, size, 3), dtype=np.float32)
+    rgb[:, : size // 2] = (1.0, 0.0, 0.05)  # fully saturated, left half
+    rgb[:, size // 2 :] = (0.5, 0.4, 0.6)  # moderately saturated, right half
+
+    result = apply_saturation_guard(rgb, strength=1.0)
+
+    def sat(region: np.ndarray) -> float:
+        return float((region.max(axis=-1) - region.min(axis=-1)).mean())
+
+    assert sat(result[:, :32]) < sat(rgb[:, :32])
+
+
+def test_saturation_guard_leaves_a_vivid_but_not_blown_preset_look_alone() -> None:
+    # A moderately vivid, tonally-varied region — the kind a Film Simulation
+    # preset like Velvia is *meant* to produce — must not be flattened.
+    rgb = np.full((32, 32, 3), (0.5, 0.4, 0.6), dtype=np.float32)
+
+    result = apply_saturation_guard(rgb, strength=1.0)
+
+    assert np.allclose(result, rgb, atol=1e-3)
+
+
+def test_apply_saturation_guard_to_buffer_preserves_alpha_and_metadata() -> None:
+    data = np.concatenate(
+        [
+            np.tile(np.array([1.0, 0.0, 0.05], dtype=np.float32), (64, 64, 1)),
+            np.full((64, 64, 1), 0.7, dtype=np.float32),
+        ],
+        axis=-1,
+    )
+    buffer = ImageBuffer(
+        data=data, source_path=Path("/tmp/x.png"), color_space="sRGB", bit_depth=8, is_raw=False
+    )
+
+    result = apply_saturation_guard_to_buffer(buffer)
+
+    assert result.channels == 4
+    assert np.allclose(result.data[..., 3], 0.7)
+    assert result.source_path == buffer.source_path
+    assert not np.allclose(result.data[..., :3], buffer.data[..., :3])
 
 
 def test_apply_local_balance_to_buffer_preserves_alpha_and_metadata() -> None:

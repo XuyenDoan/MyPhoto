@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (Desktop) — vivid Film Simulations could re-introduce oversaturation
+
+- A 40-photo statistical test (synthetic scenes across portrait/landscape/
+  mixed categories, injected exposure/color-cast/oversaturation/tilt
+  defects, run through the full auto pipeline) found that
+  `apply_local_balance()`'s saturation correction — which runs on the
+  source photo *before* the Base Profile/Film Simulation, per the chosen
+  pipeline order — could be undone by a vivid preset's own hue-selective
+  3D LUT (e.g. Velvia), so the *exported* photo could still come out
+  posterized/oversaturated in patches the pre-preset pass had no way to
+  anticipate. Fixed by adding `local_adjust.apply_saturation_guard()`, a
+  second, gentler one-directional saturation clamp that runs *after* the
+  preset — its ceiling sits well above a normal vivid preset's typical
+  range so it doesn't fight the preset's intended look, only stepping in
+  on genuinely blown/posterized chroma. Gated by the same
+  "Auto-Balance Light & Color" checkbox, applied after
+  `PresetEngine.render()` in both `EditSession.render_preview()` and
+  `BatchItemRunnable.run()`.
+
 ### Added (Desktop) — Auto-Level Horizon
 
 - A new "Auto-Level Horizon (beta)" checkbox (off by default, Smart

@@ -77,6 +77,16 @@ _MIN_LUMINANCE_FOR_GAIN = 0.03
 
 _MAX_SATURATION_SHIFT = 0.4
 
+#: A separate, gentler saturation ceiling applied *after* the Film
+#: Simulation preset (see ``apply_saturation_guard``). Deliberately higher
+#: than ``_MAX_TARGET_SATURATION``: a vivid preset like Velvia is
+#: *supposed* to sit well above typical saturation, so this only steps in
+#: for a genuinely blown-out region — one a preset's own hue-selective LUT
+#: pushed further than the pre-preset pass (which ran on the un-styled
+#: source) could have anticipated.
+_POST_PRESET_MAX_SATURATION = 0.9
+_POST_PRESET_MAX_SATURATION_SHIFT = 0.6
+
 
 def _auto_white_balance(rgb: np.ndarray, strength: float) -> np.ndarray:
     """Gray-world white balance: scale channels so their averages match."""
@@ -89,6 +99,55 @@ def _auto_white_balance(rgb: np.ndarray, strength: float) -> np.ndarray:
     gains = np.clip(gains, _MIN_WHITE_BALANCE_GAIN, _MAX_WHITE_BALANCE_GAIN)
     result: np.ndarray = np.clip(rgb * gains, 0.0, 1.0)
     return result
+
+
+def _pull_down_saturation(
+    rgb: np.ndarray, sigma: float, target: float, max_shift: float, strength: float
+) -> np.ndarray:
+    """One-directional local saturation clamp: never raises saturation, only
+    pulls a region's HLS saturation back toward ``target`` once it exceeds it.
+    """
+    hls = cv2.cvtColor(rgb, cv2.COLOR_RGB2HLS)
+    saturation = hls[..., 2]
+    local_saturation = cv2.GaussianBlur(saturation, (0, 0), sigma)
+    excess = np.clip(local_saturation - target, 0.0, None)
+    saturation_shift = np.clip(excess * strength, 0.0, max_shift)
+    hls[..., 2] = np.clip(saturation - saturation_shift, 0.0, 1.0)
+    result: np.ndarray = cv2.cvtColor(hls, cv2.COLOR_HLS2RGB)
+    return result
+
+
+def apply_saturation_guard(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
+    """A gentler, higher-ceiling version of the saturation clamp in
+    :func:`apply_local_balance`, meant to run *after* the Film Simulation
+    preset rather than before it.
+
+    ``apply_local_balance`` runs on the un-styled source photo, before the
+    preset's own hue-selective grading (3D LUT) is applied — so a region
+    that was reasonably saturated pre-preset can still come out of a vivid
+    preset (Velvia, Classic Chrome, ...) blown out. This is a final safety
+    net for that case: it only intervenes on genuinely oversaturated
+    regions (``_POST_PRESET_MAX_SATURATION`` sits well above a vivid
+    preset's normal range), so it doesn't fight the preset's intended look.
+    """
+    if strength <= 0.0:
+        no_op: np.ndarray = np.clip(rgb, 0.0, 1.0).astype(np.float32)
+        return no_op
+    clipped = np.clip(rgb, 0.0, 1.0).astype(np.float32)
+    sigma = max(rgb.shape[0], rgb.shape[1]) * _BLUR_SIGMA_FRACTION
+    return _pull_down_saturation(
+        clipped, sigma, _POST_PRESET_MAX_SATURATION, _POST_PRESET_MAX_SATURATION_SHIFT, strength
+    )
+
+
+def apply_saturation_guard_to_buffer(buffer: ImageBuffer, strength: float = 1.0) -> ImageBuffer:
+    """Apply :func:`apply_saturation_guard` to ``buffer``'s RGB channels, alpha untouched."""
+    rgb = apply_saturation_guard(buffer.data[..., :3], strength)
+    if buffer.channels == 4:
+        data = np.concatenate([rgb, buffer.data[..., 3:]], axis=-1)
+    else:
+        data = rgb
+    return replace(buffer, data=data.astype(np.float32))
 
 
 def apply_local_balance(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
@@ -113,15 +172,7 @@ def apply_local_balance(rgb: np.ndarray, strength: float = 1.0) -> np.ndarray:
     gain = np.clip(gain, _MIN_EXPOSURE_GAIN, _MAX_EXPOSURE_GAIN)
     exposed = np.clip(clipped * gain[..., np.newaxis], 0.0, 1.0)
 
-    hls = cv2.cvtColor(exposed, cv2.COLOR_RGB2HLS)
-    saturation = hls[..., 2]
-    local_saturation = cv2.GaussianBlur(saturation, (0, 0), sigma)
-
-    excess = np.clip(local_saturation - _MAX_TARGET_SATURATION, 0.0, None)
-    saturation_shift = np.clip(excess * strength, 0.0, _MAX_SATURATION_SHIFT)
-    hls[..., 2] = np.clip(saturation - saturation_shift, 0.0, 1.0)
-
-    result: np.ndarray = cv2.cvtColor(hls, cv2.COLOR_HLS2RGB)
+    result = _pull_down_saturation(exposed, sigma, _MAX_TARGET_SATURATION, _MAX_SATURATION_SHIFT, strength)
     return result
 
 

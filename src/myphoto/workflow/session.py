@@ -12,7 +12,10 @@ from myphoto.batch.models import BatchJob
 from myphoto.batch.processor import BatchProcessor
 from myphoto.color_engine.auto_level import apply_auto_level_to_buffer
 from myphoto.color_engine.composition_suggest import suggest_crop
-from myphoto.color_engine.local_adjust import apply_local_balance_to_buffer
+from myphoto.color_engine.local_adjust import (
+    apply_local_balance_to_buffer,
+    apply_saturation_guard_to_buffer,
+)
 from myphoto.export_engine.models import ExportOptions
 from myphoto.export_engine.writer import ExportEngine
 from myphoto.image_loader.loader import ImageLoader
@@ -152,6 +155,8 @@ class EditSession(QObject):
                 self.strength,
                 grain_amount=self.grain_amount,
             )
+            if self.local_balance_enabled:
+                rendered = apply_saturation_guard_to_buffer(rendered)
         except Exception as exc:  # noqa: BLE001 - surfaced to the UI, never fatal.
             self.preview_failed.emit(str(exc))
             return

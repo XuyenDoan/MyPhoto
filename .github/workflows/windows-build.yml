@@ -6,6 +6,7 @@ on:
     paths:
       - "src/**"
       - "presets/**"
+      - "models/**"
       - "myphoto.spec"
       - "pyproject.toml"
       - "requirements.txt"

@@ -1,12 +1,20 @@
-"""Heuristic (non-ML) Film Simulation suggestion based on image statistics.
+"""Nearest-centroid Film Simulation suggestion based on image statistics
+plus a real (deep-learning) face detector.
 
-This is *not* a trained model — no machine learning, no bundled weights,
-nothing sent over the network. It's a nearest-centroid classifier: each
-Film Simulation has a hand-authored "typical photo" feature vector (how
-warm/bright/contrasty/saturated a photo suits it, plus how much skin tone
-or foliage/sky it usually has), and the loaded photo's own measured
-statistics are matched to whichever centroid is closest (normalized
-Euclidean distance across every feature at once).
+This is not a cloud AI call — no network round-trip, no per-image cost,
+no photo ever leaves the device. It combines two local, offline pieces:
+
+1. A hand-authored "typical photo" feature vector per Film Simulation
+   (how warm/bright/contrasty/saturated a photo suits it, how much
+   foliage/sky it usually has, and — via `face_detector.face_confidence`
+   — how likely it is to contain a face), matched by normalized Euclidean
+   distance (nearest-centroid classifier).
+2. `preset_engine.face_detector`, a small pretrained ONNX face detector
+   (MIT-licensed, bundled in `models/`) run via `onnxruntime` — this
+   replaced an earlier hue-range "does this look like skin color" guess,
+   which had no way to tell an actual face apart from any other object
+   sharing a similar hue/saturation (wood, sand, orange fabric, ...) and
+   skewed unreliably across skin tones.
 
 Why nearest-centroid rather than a simple weighted-sum-of-signals score
 (this module's first version): a weighted sum lets one strong signal (e.g.
@@ -30,6 +38,7 @@ import numpy as np
 
 from myphoto.color_engine.adapters.opencv_adapter import OpenCVColorMath
 from myphoto.core.image import ImageBuffer
+from myphoto.preset_engine.face_detector import face_confidence as _face_confidence
 
 #: Used when nothing else scores above zero, or the analysis can't run
 #: (e.g. an empty image) — Provia is the "standard" simulation.
@@ -46,18 +55,20 @@ class _SceneStats:
     brightness: float  # mean HLS lightness, 0..1
     contrast: float  # std of HLS lightness, 0..1
     mean_saturation: float  # mean HLS saturation, 0..1
-    skin_ratio: float  # fraction of pixels in a typical skin-tone range
+    face_confidence: float  # highest face-detector confidence found, 0..1
     nature_ratio: float  # fraction of pixels in typical foliage/sky hue ranges
 
 
-#: (warmth, brightness, contrast, saturation, skin_ratio, nature_ratio) —
-#: hand-authored "typical photo" centroid for each shipped Film Simulation.
+#: (warmth, brightness, contrast, saturation, face_confidence, nature_ratio)
+#: — hand-authored "typical photo" centroid for each shipped Film Simulation.
+#: Portrait-oriented presets expect a confidently-detected face (0.8+);
+#: everything else expects little to no chance of one.
 _CENTROIDS: dict[str, tuple[float, float, float, float, float, float]] = {
-    "provia": (0.00, 0.50, 0.18, 0.35, 0.05, 0.10),
+    "provia": (0.00, 0.50, 0.18, 0.35, 0.10, 0.10),
     "velvia": (0.02, 0.50, 0.22, 0.60, 0.00, 0.55),
-    "astia": (0.03, 0.55, 0.15, 0.40, 0.60, 0.05),
-    "pro_neg_hi": (0.02, 0.50, 0.22, 0.35, 0.50, 0.05),
-    "pro_neg_std": (0.02, 0.50, 0.14, 0.30, 0.50, 0.05),
+    "astia": (0.03, 0.55, 0.15, 0.40, 0.85, 0.05),
+    "pro_neg_hi": (0.02, 0.50, 0.22, 0.35, 0.80, 0.05),
+    "pro_neg_std": (0.02, 0.50, 0.14, 0.30, 0.80, 0.05),
     "reala_ace": (0.00, 0.50, 0.20, 0.45, 0.10, 0.30),
     "classic_chrome": (-0.03, 0.45, 0.16, 0.28, 0.10, 0.15),
     "classic_neg": (-0.05, 0.45, 0.18, 0.30, 0.15, 0.10),
@@ -85,7 +96,14 @@ def suggest_film_simulation_id(buffer: ImageBuffer, available_ids: set[str]) -> 
         return FALLBACK_PRESET_ID if FALLBACK_PRESET_ID in available_ids else next(iter(available_ids), FALLBACK_PRESET_ID)
 
     stats = _analyze(buffer)
-    vector = (stats.warmth, stats.brightness, stats.contrast, stats.mean_saturation, stats.skin_ratio, stats.nature_ratio)
+    vector = (
+        stats.warmth,
+        stats.brightness,
+        stats.contrast,
+        stats.mean_saturation,
+        stats.face_confidence,
+        stats.nature_ratio,
+    )
 
     ranked = sorted(_CENTROIDS.items(), key=lambda item: _distance(vector, item[1]))
     for preset_id, _centroid in ranked:
@@ -119,9 +137,6 @@ def _analyze(buffer: ImageBuffer) -> _SceneStats:
 
     # Hue ranges below are OpenCV's 0-360 HLS hue scale, chosen generously
     # (not from any ground-truth dataset) to catch typical cases.
-    skin_mask = (
-        (hue >= 5) & (hue <= 45) & (saturation >= 0.15) & (saturation <= 0.75) & (lightness >= 0.25) & (lightness <= 0.85)
-    )
     green_mask = (hue >= 70) & (hue <= 170) & (saturation >= 0.15)
     sky_mask = (hue >= 180) & (hue <= 260) & (saturation >= 0.1) & (lightness >= 0.4)
 
@@ -130,6 +145,6 @@ def _analyze(buffer: ImageBuffer) -> _SceneStats:
         brightness=brightness,
         contrast=contrast,
         mean_saturation=mean_saturation,
-        skin_ratio=float(skin_mask.mean()),
+        face_confidence=_face_confidence(buffer),
         nature_ratio=float((green_mask | sky_mask).mean()),
     )

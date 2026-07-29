@@ -95,8 +95,13 @@ def test_render_preview_failure_emits_preview_failed(session: EditSession, tmp_p
 
 
 def test_auto_suggest_updates_film_simulation_and_emits_signal(
-    session: EditSession, tmp_path: Path, qtbot
+    session: EditSession, tmp_path: Path, qtbot, monkeypatch
 ) -> None:
+    # face_confidence comes from a real pretrained face detector; mock it
+    # here since this test is about the session/signal wiring, not about
+    # whether a tiny synthetic patch happens to look like a real face.
+    monkeypatch.setattr("myphoto.preset_engine.auto_suggest._face_confidence", lambda buffer: 0.95)
+
     path = tmp_path / "portrait.png"
     skin_tone = np.tile(np.array([204, 153, 128], dtype=np.uint8), (8, 8, 1))
     Image.fromarray(skin_tone, mode="RGB").save(path)

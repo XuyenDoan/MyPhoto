@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added (Desktop) — real face detection for auto-suggest
+
+- `preset_engine.face_detector`: auto-suggest's portrait signal now comes
+  from a small pretrained ONNX face detector ("Ultra-Light-Fast-Generic-
+  Face-Detector-1MB", MIT-licensed, bundled at `models/face_detector.onnx`,
+  ~1.2MB) run locally via `onnxruntime` — fully offline, no network call,
+  no per-image cost, no photo ever leaves the device. Replaces the earlier
+  hue-range "does this look like skin color" heuristic, which had no way
+  to distinguish an actual face from any other object sharing a similar
+  hue/saturation (wood, sand, orange fabric, ...) and skewed unreliably
+  across different skin tones; verified it correctly does *not* flag a
+  flat "skin-colored" test patch as a face (unlike the old heuristic,
+  which flagged it 100%). `auto_suggest`'s nearest-centroid classifier now
+  uses this face confidence in place of the old skin-pixel ratio.
+
 ### Added (Desktop) — hue-selective 3D LUTs for Film Simulations
 
 - 11 of the 13 Film Simulations (all except Provia, the neutral baseline,

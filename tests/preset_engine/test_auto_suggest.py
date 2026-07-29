@@ -34,10 +34,22 @@ def test_saturated_greenery_and_sky_suggests_velvia() -> None:
     assert suggest_film_simulation_id(_buffer(rgb), _ALL_IDS) == "velvia"
 
 
-def test_skin_tone_dominant_image_suggests_astia() -> None:
-    rgb = _uniform((0.8, 0.6, 0.5))
+def test_detected_face_suggests_astia(monkeypatch) -> None:
+    # face_confidence comes from a real (pretrained) face detector, not a
+    # hue-range guess — mock it directly rather than relying on a synthetic
+    # image the detector would actually recognize as a face.
+    monkeypatch.setattr("myphoto.preset_engine.auto_suggest._face_confidence", lambda buffer: 0.95)
+    rgb = _uniform((0.8, 0.6, 0.5))  # warm, moderately saturated, bright — astia's profile
 
     assert suggest_film_simulation_id(_buffer(rgb), _ALL_IDS) == "astia"
+
+
+def test_no_face_detected_does_not_suggest_a_portrait_preset(monkeypatch) -> None:
+    monkeypatch.setattr("myphoto.preset_engine.auto_suggest._face_confidence", lambda buffer: 0.0)
+    rgb = _uniform((0.8, 0.6, 0.5))  # a flat "skin-colored" patch, but no actual face
+
+    suggestion = suggest_film_simulation_id(_buffer(rgb), _ALL_IDS)
+    assert suggestion not in {"astia", "pro_neg_hi", "pro_neg_std"}
 
 
 def test_high_contrast_desaturated_image_suggests_acros() -> None:
@@ -68,8 +80,9 @@ def test_warm_dim_muted_image_suggests_nostalgic_neg() -> None:
     assert suggest_film_simulation_id(_buffer(rgb), _ALL_IDS) == "nostalgic_neg"
 
 
-def test_falls_back_when_suggested_id_not_available() -> None:
-    rgb = _uniform((0.8, 0.6, 0.5))  # would suggest astia
+def test_falls_back_when_suggested_id_not_available(monkeypatch) -> None:
+    monkeypatch.setattr("myphoto.preset_engine.auto_suggest._face_confidence", lambda buffer: 0.95)
+    rgb = _uniform((0.8, 0.6, 0.5))  # would suggest a portrait preset
 
     assert suggest_film_simulation_id(_buffer(rgb), {"provia"}) == "provia"
 

@@ -43,9 +43,10 @@ for the technical design of both platforms.
 
 **Desktop:** Python 3.13+, PySide6, NumPy, Pillow, OpenCV (basic ops
 only), rawpy/LibRaw, OpenColorIO, LittleCMS, OpenImageIO (where
-appropriate), 3D LUT / Hald CLUT, piexif. Third-party color libraries are
-wrapped behind an Adapter Pattern — MyPhoto only implements the Preset
-Engine, Workflow, Batch Processor, and UI itself.
+appropriate), 3D LUT / Hald CLUT, piexif, onnxruntime (a small local face
+detector backing auto-suggest — see Architecture.md). Third-party color
+libraries are wrapped behind an Adapter Pattern — MyPhoto only implements
+the Preset Engine, Workflow, Batch Processor, and UI itself.
 
 **Android:** Kotlin + Jetpack Compose, a pure-Kotlin `core` module
 mirroring the desktop Color/Preset Engines, MediaStore for export, the

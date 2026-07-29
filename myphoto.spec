@@ -17,6 +17,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(project_root / "presets"), "presets"),
+        (str(project_root / "models"), "models"),
     ],
     hiddenimports=[],
     hookspath=[],

@@ -1,8 +1,8 @@
-"""Locates bundled resources (currently just ``presets/``) at runtime.
+"""Locates bundled resources (``presets/``, ``models/``) at runtime.
 
-Works both from a source checkout (``presets/`` lives beside ``src/``) and
-from a PyInstaller-frozen build (``presets/`` is bundled as data and
-extracted under ``sys._MEIPASS``).
+Works both from a source checkout (both directories live beside ``src/``)
+and from a PyInstaller-frozen build (bundled as data and extracted under
+``sys._MEIPASS``).
 """
 
 from __future__ import annotations
@@ -11,16 +11,25 @@ import sys
 from pathlib import Path
 
 
-def presets_dir() -> Path:
+def _find_bundled_dir(name: str) -> Path:
     if getattr(sys, "frozen", False):
         base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
-        candidate = base / "presets"
+        candidate = base / name
         if candidate.is_dir():
             return candidate
 
     for parent in Path(__file__).resolve().parents:
-        candidate = parent / "presets"
+        candidate = parent / name
         if candidate.is_dir():
             return candidate
 
-    raise FileNotFoundError("Could not locate the presets/ directory")
+    raise FileNotFoundError(f"Could not locate the {name}/ directory")
+
+
+def presets_dir() -> Path:
+    return _find_bundled_dir("presets")
+
+
+def face_detector_model_path() -> Path:
+    """Path to the bundled ONNX face-detector model (see ``models/README.md``)."""
+    return _find_bundled_dir("models") / "face_detector.onnx"

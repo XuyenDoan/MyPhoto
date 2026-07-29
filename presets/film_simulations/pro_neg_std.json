@@ -3,9 +3,40 @@
   "name": "PRO Neg. Std",
   "kind": "film_simulation",
   "adjustments": {
-    "tone_curve": [[0.0, 0.02], [0.25, 0.24], [0.75, 0.74], [1.0, 0.98]],
-    "hsl": { "hue_shift_degrees": 0.0, "saturation_scale": 0.95, "lightness_scale": 1.0 },
-    "color_balance": { "shadows": [0.0, 0.0, 0.005] },
-    "grain": { "amount": 0.04, "size": 1.0 }
-  }
+    "tone_curve": [
+      [
+        0.0,
+        0.02
+      ],
+      [
+        0.25,
+        0.24
+      ],
+      [
+        0.75,
+        0.74
+      ],
+      [
+        1.0,
+        0.98
+      ]
+    ],
+    "hsl": {
+      "hue_shift_degrees": 0.0,
+      "saturation_scale": 0.95,
+      "lightness_scale": 1.0
+    },
+    "color_balance": {
+      "shadows": [
+        0.0,
+        0.0,
+        0.005
+      ]
+    },
+    "grain": {
+      "amount": 0.04,
+      "size": 1.0
+    }
+  },
+  "lut": "luts/pro_neg_std.npy"
 }

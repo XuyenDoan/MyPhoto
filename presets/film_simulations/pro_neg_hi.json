@@ -3,9 +3,45 @@
   "name": "PRO Neg. Hi",
   "kind": "film_simulation",
   "adjustments": {
-    "tone_curve": [[0.0, 0.0], [0.25, 0.21], [0.75, 0.8], [1.0, 1.0]],
-    "hsl": { "hue_shift_degrees": 0.0, "saturation_scale": 1.05, "lightness_scale": 1.0 },
-    "color_balance": { "shadows": [0.0, 0.0, 0.005], "highlights": [0.005, 0.0, 0.0] },
-    "grain": { "amount": 0.05, "size": 1.0 }
-  }
+    "tone_curve": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.25,
+        0.21
+      ],
+      [
+        0.75,
+        0.8
+      ],
+      [
+        1.0,
+        1.0
+      ]
+    ],
+    "hsl": {
+      "hue_shift_degrees": 0.0,
+      "saturation_scale": 1.05,
+      "lightness_scale": 1.0
+    },
+    "color_balance": {
+      "shadows": [
+        0.0,
+        0.0,
+        0.005
+      ],
+      "highlights": [
+        0.005,
+        0.0,
+        0.0
+      ]
+    },
+    "grain": {
+      "amount": 0.05,
+      "size": 1.0
+    }
+  },
+  "lut": "luts/pro_neg_hi.npy"
 }

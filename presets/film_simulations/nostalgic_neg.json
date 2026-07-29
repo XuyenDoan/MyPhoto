@@ -3,13 +3,50 @@
   "name": "Nostalgic Neg",
   "kind": "film_simulation",
   "adjustments": {
-    "tone_curve": [[0.0, 0.05], [0.25, 0.27], [0.75, 0.74], [1.0, 0.97]],
-    "hsl": { "hue_shift_degrees": 4.0, "saturation_scale": 0.95, "lightness_scale": 1.0 },
-    "color_balance": {
-      "shadows": [0.02, 0.01, -0.02],
-      "midtones": [0.02, 0.01, -0.015],
-      "highlights": [0.015, 0.005, -0.01]
+    "tone_curve": [
+      [
+        0.0,
+        0.05
+      ],
+      [
+        0.25,
+        0.27
+      ],
+      [
+        0.75,
+        0.74
+      ],
+      [
+        1.0,
+        0.97
+      ]
+    ],
+    "hsl": {
+      "hue_shift_degrees": 4.0,
+      "saturation_scale": 0.95,
+      "lightness_scale": 1.0
     },
-    "grain": { "amount": 0.15, "size": 1.15 }
-  }
+    "color_balance": {
+      "shadows": [
+        0.02,
+        0.01,
+        -0.02
+      ],
+      "midtones": [
+        0.02,
+        0.01,
+        -0.015
+      ],
+      "highlights": [
+        0.015,
+        0.005,
+        -0.01
+      ]
+    },
+    "grain": {
+      "amount": 0.15,
+      "size": 1.15
+    }
+  },
+  "lut": "luts/nostalgic_neg.npy"
 }

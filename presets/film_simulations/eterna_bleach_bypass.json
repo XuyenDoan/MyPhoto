@@ -3,9 +3,45 @@
   "name": "Eterna Bleach Bypass",
   "kind": "film_simulation",
   "adjustments": {
-    "tone_curve": [[0.0, 0.0], [0.25, 0.14], [0.75, 0.88], [1.0, 1.0]],
-    "hsl": { "hue_shift_degrees": 0.0, "saturation_scale": 0.35, "lightness_scale": 1.0 },
-    "color_balance": { "shadows": [0.0, 0.0, 0.01], "highlights": [0.0, 0.0, -0.005] },
-    "grain": { "amount": 0.15, "size": 1.2 }
-  }
+    "tone_curve": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.25,
+        0.14
+      ],
+      [
+        0.75,
+        0.88
+      ],
+      [
+        1.0,
+        1.0
+      ]
+    ],
+    "hsl": {
+      "hue_shift_degrees": 0.0,
+      "saturation_scale": 0.35,
+      "lightness_scale": 1.0
+    },
+    "color_balance": {
+      "shadows": [
+        0.0,
+        0.0,
+        0.01
+      ],
+      "highlights": [
+        0.0,
+        0.0,
+        -0.005
+      ]
+    },
+    "grain": {
+      "amount": 0.15,
+      "size": 1.2
+    }
+  },
+  "lut": "luts/eterna_bleach_bypass.npy"
 }

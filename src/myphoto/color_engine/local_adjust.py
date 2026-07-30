@@ -87,9 +87,43 @@ from myphoto.core.image import ImageBuffer
 
 #: Gray-world white balance gain is clamped to this range so a photo that's
 #: legitimately dominated by one color (a sunset, a red wall) doesn't get
-#: forced toward an incorrect neutral gray.
-_MIN_WHITE_BALANCE_GAIN = 0.75
-_MAX_WHITE_BALANCE_GAIN = 1.35
+#: forced toward an incorrect neutral gray. Real per-channel white-balance
+#: corrections (including in-camera auto WB) rarely exceed roughly +/-15%;
+#: the previous +/-35% range let gray-world force *any* warm-dominant real
+#: photo (skin, wood, foliage, golden-hour light — not just an actual
+#: color-cast defect) most of the way to neutral gray, which reads as a
+#: strong, unnatural blue cast on skin/trees/clothes alike (found via
+#: testing: a warm skin-tone-dominant photo with no real cast came out
+#: with its blue channel raised to nearly equal its red channel).
+_MIN_WHITE_BALANCE_GAIN = 0.9
+_MAX_WHITE_BALANCE_GAIN = 1.12
+
+#: Gray-world's raw estimate (scale every channel so its mean exactly
+#: matches the overall gray mean) assumes the *entire* frame should average
+#: to neutral — true only for a photo with no single dominant memory color.
+#: Most real photos violate that (skin filling a portrait, foliage filling
+#: a landscape, a sunset's warm sky) without actually having a lighting
+#: color-cast defect. Only partially moving toward the raw estimate (rather
+#: than fully applying it) keeps the correction useful for a genuine cast
+#: (an incandescent-lit room, a shade cast) while no longer overriding a
+#: scene's legitimate dominant color — combined with the tighter gain clamp
+#: above, this is what actually keeps skin/foliage/clothing looking like
+#: themselves instead of drifting blue.
+_WHITE_BALANCE_DAMPING = 0.55
+
+#: A pixel counts as "near-neutral" for the gray-world estimate (see
+#: ``_auto_white_balance``) when its HLS saturation is below this. Typical
+#: saturated memory colors (skin ~0.3-0.5, foliage green ~0.4-0.7, a clear
+#: sky ~0.4-0.6) sit well above it; walls, clothing, concrete, overcast
+#: sky, and the neutral part of most lighting sit below it.
+_WHITE_BALANCE_LOW_SATURATION_THRESHOLD = 0.25
+
+#: The near-neutral subset only replaces the whole-frame estimate once it
+#: has enough pixels to be a trustworthy sample — otherwise (a frame that's
+#: almost entirely saturated color, e.g. a tight macro shot of a flower)
+#: fall back to the whole-frame estimate rather than basing white balance
+#: on a handful of stray pixels.
+_WHITE_BALANCE_MIN_NEUTRAL_FRACTION = 0.05
 
 #: Regions whose local luminance strays outside this band are pulled back
 #: toward the nearer edge of it — *not* toward a fixed mid-gray target.
@@ -189,9 +223,31 @@ def _auto_white_balance(rgb: np.ndarray, strength: float, exclude_mask: np.ndarr
     cast" to gray-world and gets cooled toward gray, visibly draining/
     tinting real skin tones blue. The gain is still applied to every
     pixel, excluded or not — only the *estimate* ignores them.
+
+    Beyond that face exclusion, the estimate itself is further restricted
+    to low-saturation ("near-neutral") pixels when there are enough of
+    them. Plain gray-world averages the *whole* frame — a photo with a
+    large patch of one legitimate saturated color (green foliage filling
+    the bottom half of a landscape is the most common case) skews that
+    average, and the resulting gain then gets applied to *every* region,
+    including already-neutral ones (a wall, clothing) that had nothing
+    wrong with them — that's how a photo with no real color-cast defect at
+    all still came out with skin/foliage/clothing all pushed toward blue
+    (found via testing). A genuine lighting cast (incandescent bulbs, a
+    shade cast) shows up on the near-neutral surfaces in a scene just as
+    much as on the colorful ones, so restricting the estimate to
+    near-neutral pixels keeps the correction useful for a real cast while
+    no longer being skewed by a scene's ordinary saturated content.
     """
     pixels = rgb.reshape(-1, 3)
+    hls = cv2.cvtColor(np.clip(rgb, 0.0, 1.0).astype(np.float32), cv2.COLOR_RGB2HLS)
+    low_saturation = hls[..., 2].reshape(-1) < _WHITE_BALANCE_LOW_SATURATION_THRESHOLD
     if exclude_mask is not None:
+        low_saturation &= ~exclude_mask.reshape(-1)
+    min_neutral_pixels = max(1, int(pixels.shape[0] * _WHITE_BALANCE_MIN_NEUTRAL_FRACTION))
+    if low_saturation.sum() >= min_neutral_pixels:
+        sample = pixels[low_saturation]
+    elif exclude_mask is not None:
         keep = ~exclude_mask.reshape(-1)
         sample = pixels[keep] if keep.any() else pixels
     else:
@@ -201,7 +257,8 @@ def _auto_white_balance(rgb: np.ndarray, strength: float, exclude_mask: np.ndarr
     if gray_mean < 1e-4:
         return rgb
     raw_gains = gray_mean / np.maximum(channel_means, 1e-4)
-    gains = 1.0 + (raw_gains - 1.0) * strength
+    damped_gains = 1.0 + (raw_gains - 1.0) * _WHITE_BALANCE_DAMPING
+    gains = 1.0 + (damped_gains - 1.0) * strength
     gains = np.clip(gains, _MIN_WHITE_BALANCE_GAIN, _MAX_WHITE_BALANCE_GAIN)
     result: np.ndarray = np.clip(rgb * gains, 0.0, 1.0)
     return result

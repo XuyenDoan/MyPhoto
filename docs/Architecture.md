@@ -222,26 +222,43 @@ the subject rather than just detect its presence.
 `apply_local_balance()` first runs `_auto_white_balance()`, a gray-world
 white balance: it scales each RGB channel so its average roughly matches
 the other two (a photo with no color cast has roughly equal R/G/B
-channel means), with the correction strength capped
-(`_MIN_WHITE_BALANCE_GAIN`/`_MAX_WHITE_BALANCE_GAIN`) so an obvious cast
-(warm tungsten light, a cool overcast sky) gets neutralized without
-overcorrecting a scene that's legitimately one-color-dominant (a sunset,
-a dense forest). Gray-world's classic failure case is a portrait where
-skin fills a large fraction of the frame: the skin's own warmth reads as
-"a cast" and gets cooled toward gray, visibly blue-tinting the actual
-skin tone — reported and reproduced (a 43%-of-frame face's R-minus-B
-warmth dropped 54% under the plain correction). `apply_local_balance_to_buffer()`
-detects a face (`color_engine.face_detector`, the same ONNX model
-Auto-suggest Film Simulation and Suggest Composition Crop use) and passes
-its bounding box to `_auto_white_balance()` as an `exclude_mask` — pixels
-inside it still get corrected like the rest of the photo, they just don't
-feed the gray-world *estimate*, so the face's own color isn't mistaken for
-the thing needing fixing (same test case: warmth loss dropped from 54% to
-11%). This is the one place in `local_adjust.py` that isn't purely
-classical/deterministic image processing, though it's still fully
-local/offline (no network call, no cost) — `apply_local_balance()` itself
-still takes a plain `np.ndarray` and an optional `white_balance_exclude_mask`,
-so the classical-only behavior stays directly testable without the model.
+channel means). Two safeguards keep this from overcorrecting a scene that
+has no real color-cast defect (reported and reproduced: the plain
+gray-world estimate applied at full clamp gave skin/foliage/clothing an
+unwanted blue cast across every Film Simulation preset — see
+`CHANGELOG.md` for the exact before/after numbers):
+- The estimate is restricted to low-saturation ("near-neutral") pixels
+  when there are enough of them
+  (`_WHITE_BALANCE_LOW_SATURATION_THRESHOLD`,
+  `_WHITE_BALANCE_MIN_NEUTRAL_FRACTION`) — a real lighting cast (warm
+  tungsten light, a cool overcast sky) shows up on a scene's neutral
+  surfaces (walls, clothing) just as much as its saturated ones, so
+  restricting to near-neutral pixels avoids the whole-frame average being
+  skewed by a large patch of one legitimate saturated color (green
+  foliage, skin, a sunset). Falls back to the whole frame when too few
+  near-neutral pixels exist (e.g. a tight macro shot of a flower).
+- The gain is clamped tightly (`_MIN_WHITE_BALANCE_GAIN`/
+  `_MAX_WHITE_BALANCE_GAIN`, roughly +/-12%) and only partially applied
+  (`_WHITE_BALANCE_DAMPING`) rather than fully replacing the photo's
+  actual channel averages with the gray-world target.
+
+Gray-world's other classic failure case is a portrait where skin fills a
+large fraction of the frame: the skin's own warmth reads as "a cast" and
+gets cooled toward gray. `apply_local_balance_to_buffer()` detects a face
+(`color_engine.face_detector`, the same ONNX model Auto-suggest Film
+Simulation and Suggest Composition Crop use) and passes its bounding box
+to `_auto_white_balance()` as an `exclude_mask` — pixels inside it still
+get corrected like the rest of the photo, they just don't feed the
+gray-world *estimate*. In the common case of a neutral (or near-neutral)
+background, the low-saturation restriction above already excludes the
+face on its own (skin is saturated enough to fail the near-neutral
+threshold); explicit face exclusion remains a second layer for a portrait
+whose background isn't fully neutral. This face-detection step is the one
+place in `local_adjust.py` that isn't purely classical/deterministic image
+processing, though it's still fully local/offline (no network call, no
+cost) — `apply_local_balance()` itself still takes a plain `np.ndarray`
+and an optional `white_balance_exclude_mask`, so the classical-only
+behavior stays directly testable without the model.
 
 `color_engine.local_adjust.apply_local_balance()` corrects over/under-
 exposed and over-saturated *regions* of a photo independently, rather

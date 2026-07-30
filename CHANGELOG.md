@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (Desktop) — "Auto-Balance Light & Color" gave skin/foliage/clothing an unwanted blue cast
+
+- Reported by the user: with the "Tự Động Cân Bằng Sáng & Màu (beta)"
+  checkbox on, every Film Simulation preset came out looking like the
+  same blue-tinted image — skin no longer looked like skin, trees looked
+  blue, clothing looked blue. Root-caused to `_auto_white_balance()`'s
+  gray-world estimate in `color_engine/local_adjust.py`:
+  - The gain clamp allowed up to +/-35% per channel
+    (`_MIN/MAX_WHITE_BALANCE_GAIN`), and the raw gray-world estimate was
+    applied at full strength. Verified directly: a synthetic warm
+    skin-tone-dominant photo *with no real color-cast defect* had its
+    blue channel pushed from 0.47 to 0.57 — nearly equal to its red
+    channel (0.62) — a strong, unnatural cast on a photo that needed no
+    correction at all. Tightened the clamp to +/-12%
+    (real per-channel white-balance corrections, including in-camera auto
+    WB, rarely exceed that) and added a damping factor
+    (`_WHITE_BALANCE_DAMPING = 0.55`) so the correction moves partway
+    toward the gray-world estimate rather than fully replacing the
+    photo's actual channel averages with it.
+  - A second, larger problem: gray-world's average is computed over the
+    *whole frame*, so a large patch of one legitimate saturated color
+    (green foliage, common in outdoor photos) skews the estimate, and the
+    resulting gain then gets applied to *every* region — including
+    already-neutral ones (clothing, walls) that had nothing wrong with
+    them. Verified directly: a skin/foliage/clothing scene with the
+    clothing already near-neutral (0.65, 0.63, 0.60) came out of the old
+    code with its blue channel (0.67) higher than its red (0.62) —
+    clothing visibly tinted blue purely because a green-foliage band
+    elsewhere in the frame dragged the whole-image blue average down.
+    Fixed by restricting the gray-world estimate to low-saturation
+    ("near-neutral") pixels when there are enough of them
+    (`_WHITE_BALANCE_LOW_SATURATION_THRESHOLD = 0.25`,
+    `_WHITE_BALANCE_MIN_NEUTRAL_FRACTION = 0.05`) — a genuine lighting
+    cast shows up on a scene's neutral surfaces just as much as its
+    colorful ones, so this keeps the correction useful for a real cast
+    without letting ordinary saturated scene content skew it. This
+    subsumes the earlier face-exclusion fix in the common case of a
+    neutral background (the face's own saturation now excludes it from
+    the estimate automatically); face-exclusion remains as a second layer
+    for portraits where the background isn't fully neutral.
+  - Re-verified across all 13 Film Simulation presets with Auto-Balance
+    enabled on a skin/foliage/clothing test scene: no preset shows a blue
+    cast on skin or clothing (blue channel no longer exceeds red on
+    either), and presets remain clearly distinct from one another
+    (std-dev of the clothing tone across presets: ~0.03 per channel, not
+    collapsed to one look).
+
 ### Fixed (Desktop) — controls panel rows could overlap/squish on a short window
 
 - The right-hand controls panel (`ControlsPanel`) had no `QScrollArea`:

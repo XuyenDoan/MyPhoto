@@ -74,6 +74,13 @@ QLabel#hintLabel {{
     padding-top: 2px;
 }}
 
+QToolTip {{
+    background-color: {_BG_PANEL};
+    color: {_TEXT};
+    border: 1px solid {_BORDER};
+    padding: 6px 8px;
+}}
+
 QSplitter::handle {{
     background-color: {_BORDER};
     width: 2px;

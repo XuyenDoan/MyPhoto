@@ -165,6 +165,12 @@ QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
     border-color: {ACCENT};
 }}
 
+QComboBox:disabled {{
+    color: {_TEXT};
+    background-color: {_BG_PANEL};
+    border-color: {_BORDER};
+}}
+
 QComboBox::drop-down {{
     border: none;
     width: 20px;

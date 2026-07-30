@@ -88,8 +88,10 @@ class EditSession(QObject):
         self.strength = 1.0
         self.grain_amount: float | None = None
         #: When enabled, each `render_preview()` re-picks `film_simulation_id`
-        #: via a heuristic (not ML) scene analysis of the loaded image —
-        #: see `preset_engine.auto_suggest`.
+        #: via a heuristic (not ML) scene analysis of the loaded image — see
+        #: `preset_engine.auto_suggest`. `export_all()` re-runs this analysis
+        #: independently per image, rather than reusing whatever was last
+        #: suggested for the currently-previewed photo.
         self.auto_suggest_enabled = False
         #: When enabled, over/under-exposed and over-saturated regions are
         #: corrected (see `color_engine.local_adjust`) before the Base
@@ -102,9 +104,8 @@ class EditSession(QObject):
         self.auto_level_enabled = False
         #: When enabled, render_preview() computes a suggested composition
         #: crop (see `color_engine.composition_suggest`) and emits it via
-        #: `composition_suggested` for the preview to draw as an overlay —
-        #: a proposal only, never applied to the actual rendered/exported
-        #: pixels.
+        #: `composition_suggested` for the preview to draw as an overlay;
+        #: export_all() applies that same crop to the exported pixels.
         self.composition_suggest_enabled = False
         #: When enabled, purple/green lens-fringe color at strong-contrast
         #: edges is desaturated toward neutral (see
@@ -200,6 +201,8 @@ class EditSession(QObject):
             auto_level_enabled=self.auto_level_enabled,
             fix_chromatic_aberration_enabled=self.fix_chromatic_aberration_enabled,
             auto_sharpen_enabled=self.auto_sharpen_enabled,
+            composition_suggest_enabled=self.composition_suggest_enabled,
+            auto_suggest_enabled=self.auto_suggest_enabled,
         )
         self._batch_processor.run(job)
 

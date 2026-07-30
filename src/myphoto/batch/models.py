@@ -22,6 +22,11 @@ class BatchJob:
     auto_level_enabled: bool = False
     fix_chromatic_aberration_enabled: bool = False
     auto_sharpen_enabled: bool = False
+    composition_suggest_enabled: bool = False
+    #: When enabled, each image's own Film Simulation is re-picked (see
+    #: `preset_engine.auto_suggest`) from its own scene analysis instead of
+    #: using `film_simulation_id` for every item in the batch.
+    auto_suggest_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)

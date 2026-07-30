@@ -1,6 +1,7 @@
 from itertools import pairwise
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
 from PIL import Image
@@ -26,6 +27,20 @@ def preset_engine() -> PresetEngine:
 def _make_image(path: Path) -> None:
     array = (np.random.default_rng(0).random((6, 6, 3)) * 255).astype(np.uint8)
     Image.fromarray(array).save(path)
+
+
+def _make_off_center_face_image(path: Path, size: int = 480, offset_x: int = -100) -> None:
+    """A real-enough facial structure, off-center, so a crop suggestion is meaningful."""
+    cx, cy = size // 2 + offset_x, size // 2
+    img = np.full((size, size, 3), (235, 220, 200), dtype=np.uint8)
+    cv2.ellipse(img, (cx, cy), (90, 120), 0, 0, 360, (200, 175, 150), -1)
+    for ex in (cx - 38, cx + 38):
+        ey = cy - 18
+        cv2.ellipse(img, (ex, ey), (18, 11), 0, 0, 360, (255, 255, 255), -1)
+        cv2.circle(img, (ex, ey), 7, (120, 90, 60), -1)
+        cv2.circle(img, (ex, ey), 3, (10, 10, 10), -1)
+    cv2.ellipse(img, (cx, cy + 80), (30, 10), 0, 0, 180, (100, 60, 60), -1)
+    Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)).save(path)
 
 
 def test_default_thread_pool_is_capped_regardless_of_core_count(
@@ -89,9 +104,9 @@ def test_overall_progress_emits_many_small_monotonic_steps(
     with qtbot.waitSignal(processor.finished, timeout=5000):
         processor.run(job)
 
-    # 2 images x 8 pipeline checkpoints each = 16 stage ticks, plus each
+    # 2 images x 10 pipeline checkpoints each = 20 stage ticks, plus each
     # item's own completion re-emits once more.
-    assert len(fractions) >= 16
+    assert len(fractions) >= 20
     assert all(a <= b + 1e-9 for a, b in pairwise(fractions))
     assert fractions[-1] == pytest.approx(1.0)
 
@@ -188,6 +203,71 @@ def test_auto_sharpen_enabled_still_succeeds(
     assert results[0].succeeded
     assert results[0].output_path is not None
     assert results[0].output_path.exists()
+
+
+def test_auto_suggest_enabled_picks_film_simulation_per_item(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine, monkeypatch
+) -> None:
+    import myphoto.batch.worker as worker_module
+
+    seen_ids: list[str] = []
+
+    def _fake_suggest(buffer, available_ids):
+        seen_ids.append("sepia")
+        return "sepia"
+
+    monkeypatch.setattr(worker_module, "suggest_film_simulation_id", _fake_suggest)
+
+    path = tmp_path / "img.png"
+    _make_image(path)
+    options = ExportOptions(format="jpeg", output_dir=tmp_path / "out")
+    # film_simulation_id is deliberately "provia" so a differing exported
+    # result can only be explained by the per-item auto-suggested override.
+    job = BatchJob((path,), "fujifilm", "provia", 1.0, options, auto_suggest_enabled=True)
+
+    processor = BatchProcessor(preset_engine)
+    with qtbot.waitSignal(processor.finished, timeout=5000) as blocker:
+        processor.run(job)
+
+    results = blocker.args[0]
+    assert results[0].succeeded
+    assert seen_ids == ["sepia"]
+
+
+def test_composition_suggest_enabled_actually_crops_the_export(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine
+) -> None:
+    path = tmp_path / "img.png"
+    _make_off_center_face_image(path)
+    options = ExportOptions(format="png", output_dir=tmp_path / "out")
+    job = BatchJob((path,), "fujifilm", "provia", 1.0, options, composition_suggest_enabled=True)
+
+    processor = BatchProcessor(preset_engine)
+    with qtbot.waitSignal(processor.finished, timeout=5000) as blocker:
+        processor.run(job)
+
+    results = blocker.args[0]
+    assert results[0].succeeded
+    with Image.open(results[0].output_path) as exported:
+        assert exported.size != (480, 480)
+
+
+def test_composition_suggest_disabled_exports_full_frame(
+    qtbot, tmp_path: Path, preset_engine: PresetEngine
+) -> None:
+    path = tmp_path / "img.png"
+    _make_off_center_face_image(path)
+    options = ExportOptions(format="png", output_dir=tmp_path / "out")
+    job = BatchJob((path,), "fujifilm", "provia", 1.0, options)
+
+    processor = BatchProcessor(preset_engine)
+    with qtbot.waitSignal(processor.finished, timeout=5000) as blocker:
+        processor.run(job)
+
+    results = blocker.args[0]
+    assert results[0].succeeded
+    with Image.open(results[0].output_path) as exported:
+        assert exported.size == (480, 480)
 
 
 def test_missing_source_file_produces_failed_result(

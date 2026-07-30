@@ -3,7 +3,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from myphoto.color_engine.composition_suggest import suggest_crop
+from myphoto.color_engine.composition_suggest import (
+    apply_composition_crop_to_buffer,
+    suggest_crop,
+)
 from myphoto.core.image import ImageBuffer
 
 
@@ -66,3 +69,25 @@ def test_falls_back_to_saliency_when_no_face_present() -> None:
 def test_too_small_image_returns_none() -> None:
     rgb = np.zeros((2, 2, 3), dtype=np.float32)
     assert suggest_crop(_buffer(rgb)) is None
+
+
+def test_apply_composition_crop_actually_crops_the_buffer() -> None:
+    rgb = _synthetic_face_image()
+    suggestion = suggest_crop(_buffer(rgb))
+    assert suggestion is not None
+
+    cropped = apply_composition_crop_to_buffer(_buffer(rgb))
+
+    assert cropped.data.shape == (suggestion.height, suggestion.width, 3)
+    assert cropped.data.shape != rgb.shape
+    np.testing.assert_array_equal(
+        cropped.data,
+        rgb[suggestion.y : suggestion.y + suggestion.height, suggestion.x : suggestion.x + suggestion.width],
+    )
+
+
+def test_apply_composition_crop_is_a_no_op_when_no_subject_found() -> None:
+    rgb = np.zeros((2, 2, 3), dtype=np.float32)
+    buffer = _buffer(rgb)
+
+    assert apply_composition_crop_to_buffer(buffer) is buffer

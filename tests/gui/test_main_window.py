@@ -24,7 +24,7 @@ def test_window_constructs_and_populates_preset_dropdowns(qtbot, tmp_path: Path)
     qtbot.addWidget(window)
 
     assert window._controls_panel._base_profile_combo.count() == 8
-    assert window._controls_panel._film_simulation_combo.count() == 13
+    assert window._controls_panel._film_simulation_combo.count() == 14
     # The dropdown selection must match what EditSession will actually render,
     # not just whatever preset happens to sort first alphabetically.
     assert window._controls_panel.selected_base_profile_id() == window._session.base_profile_id

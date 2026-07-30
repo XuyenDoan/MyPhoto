@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from myphoto.core.errors import PresetNotFoundError, PresetValidationError
-from myphoto.preset_engine.models import Preset, PresetKind
+from myphoto.preset_engine.models import NO_FILM_SIMULATION_ID, Preset, PresetKind
 from myphoto.preset_engine.serialization import preset_from_json
 
 
@@ -32,7 +32,11 @@ class PresetLoader:
         return sorted(self._base_profiles.values(), key=lambda preset: preset.name)
 
     def list_film_simulations(self) -> list[Preset]:
-        return sorted(self._film_simulations.values(), key=lambda preset: preset.name)
+        return sorted(
+            self._film_simulations.values(),
+            key=lambda preset: (preset.id != NO_FILM_SIMULATION_ID, preset.name),
+        )
+
 
     def get_base_profile(self, preset_id: str) -> Preset:
         return self._get(self._base_profiles, preset_id)

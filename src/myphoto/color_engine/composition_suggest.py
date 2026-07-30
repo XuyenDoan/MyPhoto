@@ -1,10 +1,10 @@
-"""AI-assisted composition crop suggestion — a proposal only, never applied.
+"""AI-assisted composition crop suggestion.
 
-Unlike every other "auto" feature in this app, cropping is a creative
-decision, not a technical correction — there's no objectively "right"
-answer, so this only ever *suggests* a rule-of-thirds-aligned crop (drawn
-as an overlay on the preview) for the user to accept, adjust, or ignore.
-It never touches exported pixels.
+`suggest_crop` proposes a rule-of-thirds-aligned crop, drawn as an overlay
+on the preview so the user can see it before committing to anything.
+`apply_composition_crop_to_buffer` applies that same suggestion to a
+buffer's actual pixels — used when the "Gợi ý bố cục" checkbox is enabled,
+so the exported photo is cropped to match what the overlay showed.
 
 Finds the photo's main subject via a small AI model when possible (the
 same face detector `preset_engine.auto_suggest` uses — see
@@ -19,7 +19,7 @@ possible.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import cv2
 import numpy as np
@@ -122,3 +122,17 @@ def suggest_crop(buffer: ImageBuffer) -> CropSuggestion | None:
                     source=source,
                 )
     return best
+
+
+def apply_composition_crop_to_buffer(buffer: ImageBuffer) -> ImageBuffer:
+    """Return ``buffer`` cropped to :func:`suggest_crop`'s suggestion, or
+    unchanged if no subject could be located.
+    """
+    suggestion = suggest_crop(buffer)
+    if suggestion is None:
+        return buffer
+    data = buffer.data[
+        suggestion.y : suggestion.y + suggestion.height,
+        suggestion.x : suggestion.x + suggestion.width,
+    ]
+    return replace(buffer, data=data.astype(np.float32))

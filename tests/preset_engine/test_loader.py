@@ -87,5 +87,5 @@ def test_shipped_repository_presets_all_load() -> None:
     assert sim_ids == {
         "provia", "velvia", "astia", "classic_chrome", "classic_neg",
         "eterna", "acros", "nostalgic_neg", "reala_ace",
-        "pro_neg_hi", "pro_neg_std", "eterna_bleach_bypass", "sepia",
+        "pro_neg_hi", "pro_neg_std", "eterna_bleach_bypass", "sepia", "none",
     }

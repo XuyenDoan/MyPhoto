@@ -20,6 +20,10 @@ class PresetEngine:
         self._loader = loader
         self._pipeline = pipeline if pipeline is not None else ColorPipeline()
 
+    @property
+    def loader(self) -> PresetLoader:
+        return self._loader
+
     def render(
         self,
         buffer: ImageBuffer,
